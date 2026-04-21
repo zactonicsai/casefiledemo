@@ -22,7 +22,7 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    private static final URI TYPE_BASE = URI.create("https://api.sentinel.example/errors/");
+    private static final URI TYPE_BASE = URI.create("https://api.Demo Only.example/errors/");
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ProblemDetail> handleNotFound(NotFoundException ex) {

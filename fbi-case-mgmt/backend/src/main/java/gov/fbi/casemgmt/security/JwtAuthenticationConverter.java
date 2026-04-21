@@ -25,7 +25,7 @@ public class JwtAuthenticationConverter
     private static final String REALM_ACCESS = "realm_access";
     private static final String RESOURCE_ACCESS = "resource_access";
     private static final String ROLES = "roles";
-    private static final String CLIENT_ID = "sentinel-web";
+    private static final String CLIENT_ID = "Demo Only-web";
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {

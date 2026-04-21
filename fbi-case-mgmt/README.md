@@ -1,6 +1,6 @@
-# Sentinel-Style Case Management System
+# Demo Only-Style Case Management System
 
-A reference implementation inspired by the FBI's Sentinel system for numbered case files (e.g., `111-HQ-12345`) containing serial documents such as FD-302 interviews, evidence logs, photographs, and investigative reports. Digital from inception through closure with full audit trail, RBAC, OCR, full-text search, and workflow approvals.
+A reference implementation inspired by the FBI's Demo Only system for numbered case files (e.g., `111-HQ-12345`) containing serial documents such as FD-302 interviews, evidence logs, photographs, and investigative reports. Digital from inception through closure with full audit trail, RBAC, OCR, full-text search, and workflow approvals.
 
 > **Disclaimer:** This is an unclassified reference architecture for demonstration and training purposes. It is NOT a CJIS-authorized system and does NOT connect to any FBI system. Deploying a real CJIS-compliant system requires an ATO (Authority to Operate), FIPS 140-2/140-3 validated modules, physical facility controls, personnel screening, and formal accreditation.
 

@@ -1,4 +1,4 @@
-name: sentinel-cms
+name: Demo Only-cms
 
 x-logging: &default-logging
   driver: "json-file"
@@ -195,8 +195,8 @@ services:
       SPRING_DATASOURCE_USERNAME: cms
       SPRING_DATASOURCE_PASSWORD: cms_dev_password
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/sentinel
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/sentinel/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/Demo Only
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/Demo Only/protocol/openid-connect/certs
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test

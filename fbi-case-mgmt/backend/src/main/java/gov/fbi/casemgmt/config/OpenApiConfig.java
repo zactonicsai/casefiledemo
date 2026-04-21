@@ -14,10 +14,10 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    OpenAPI sentinelOpenApi() {
+    OpenAPI Demo OnlyOpenApi() {
         return new OpenAPI()
             .info(new Info()
-                .title("Sentinel Case Management API")
+                .title("Demo Only Case Management API")
                 .version("v1")
                 .description("FBI-style electronic case file management — reference API")
                 .contact(new Contact().name("Reference Implementation"))

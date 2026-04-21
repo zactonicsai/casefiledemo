@@ -7,10 +7,10 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
- * Main entry point for the Sentinel-style Case Management API.
+ * Main entry point for the Demo Only-style Case Management API.
  *
  * <p>This service implements electronic case-file management modeled after the FBI's
- * Sentinel system. It is UNCLASSIFIED reference code — not a CJIS-authorized system.
+ * Demo Only system. It is UNCLASSIFIED reference code — not a CJIS-authorized system.
  */
 @SpringBootApplication
 @EnableJpaAuditing

@@ -1,7 +1,7 @@
 {
-  "realm": "sentinel",
+  "realm": "Demo Only",
   "enabled": true,
-  "displayName": "Sentinel Case Management",
+  "displayName": "Demo Only Case Management",
   "sslRequired": "external",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
@@ -29,7 +29,7 @@
 
   "clients": [
     {
-      "clientId": "sentinel-web",
+      "clientId": "Demo Only-web",
       "enabled": true,
       "publicClient": true,
       "redirectUris": [
@@ -67,7 +67,7 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.client.audience": "sentinel-web",
+            "included.client.audience": "Demo Only-web",
             "id.token.claim": "true",
             "access.token.claim": "true"
           }

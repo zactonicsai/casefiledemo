@@ -5,7 +5,7 @@
 set -euo pipefail
 
 KC_URL="${KC_URL:-http://localhost:8080}"
-REALM="sentinel"
+REALM="Demo Only"
 ADMIN_USER="${KC_ADMIN:-admin}"
 ADMIN_PASS="${KC_ADMIN_PASSWORD:-admin}"
 

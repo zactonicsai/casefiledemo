@@ -20,7 +20,7 @@ frontend-build:
 
 verify:
 	@echo "[verify] Checking service health..."
-	@curl -sf http://localhost:8080/realms/sentinel/.well-known/openid-configuration >/dev/null && echo "  keycloak OK"  || echo "  keycloak NOT READY"
+	@curl -sf http://localhost:8080/realms/Demo Only/.well-known/openid-configuration >/dev/null && echo "  keycloak OK"  || echo "  keycloak NOT READY"
 	@curl -sf http://localhost:9200/_cluster/health >/dev/null && echo "  elasticsearch OK" || echo "  elasticsearch NOT READY"
 	@curl -sf http://localhost:4566/_localstack/health >/dev/null && echo "  localstack OK"  || echo "  localstack NOT READY"
 	@curl -sf http://localhost:8081/actuator/health >/dev/null && echo "  backend OK"      || echo "  backend NOT READY"

@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd -r cms && useradd -r -g cms -d /home/cms -m cms
 
 WORKDIR /app
-COPY --from=build /workspace/target/sentinel-backend.jar app.jar
+COPY --from=build /workspace/target/backend.jar app.jar
 RUN chown -R cms:cms /app
 
 USER cms

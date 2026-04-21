@@ -2,7 +2,7 @@
 
 ## Overview
 
-Sentinel CMS is a reference implementation of an FBI-style electronic case management system. It models the Sentinel application's core behaviors — numbered case files, serial documents, workflow approvals, full-text search, and audit trails — using modern open-source infrastructure.
+Demo Only CMS is a reference implementation of an FBI-style electronic case management system. It models the Demo Only application's core behaviors — numbered case files, serial documents, workflow approvals, full-text search, and audit trails — using modern open-source infrastructure.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -17,7 +17,7 @@ Sentinel CMS is a reference implementation of an FBI-style electronic case manag
     ┌──────────────────┐   ┌───────────────────────────────────────┐
     │  Keycloak 24     │   │  Spring Boot 3.5.13 (Java 21)         │
     │  (OIDC, PKCE)    │   │  ────────────────────────────────     │
-    │  realm=sentinel  │   │  Controllers                          │
+    │  realm=Demo Only  │   │  Controllers                          │
     └──────────────────┘   │  ├─ CaseController                    │
                            │  ├─ DocumentController                │
                            │  ├─ SearchController                  │

@@ -10,7 +10,7 @@ import { AuthService } from '../../core/auth.service';
   template: `
     <div class="login-wrap">
       <div class="login-card">
-        <div class="seal">SENTINEL</div>
+        <div class="seal">Demo Only</div>
         <h1>Case Management System</h1>
         <p class="disclaimer">
           UNCLASSIFIED reference system. Authorized users only.

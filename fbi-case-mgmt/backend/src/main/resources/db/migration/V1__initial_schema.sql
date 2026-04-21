@@ -1,5 +1,5 @@
 -- =============================================================================
--- V1: Initial schema for Sentinel case management.
+-- V1: Initial schema for Demo Only case management.
 -- =============================================================================
 
 CREATE TABLE cases (

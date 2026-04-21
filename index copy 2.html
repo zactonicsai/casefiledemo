@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Case Management Simulator - OpenLayers</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.5.0/ol.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@v7.5.0/dist/ol.js"></script>
+  <style>
+    .tab-btn.active { background:#1d4ed8; color:white; }
+    .help-dot {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:18px; height:18px; border-radius:9999px; font-size:12px;
+      background:#dbeafe; color:#1e40af; cursor:pointer; margin-left:6px;
+    }
+    .kanban-col { min-height: 280px; }
+    .ol-popup {
+      position: absolute;
+      background-color: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      bottom: 12px;
+      left: -50px;
+      min-width: 260px;
+    }
+    .metric-card { min-height: 108px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+  <div class="max-w-7xl mx-auto p-4 md:p-6">
+    <div class="bg-gradient-to-r from-blue-900 to-slate-800 text-white rounded-2xl shadow-xl p-6 mb-6">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-bold">Case Management Simulator</h1>
+          <p class="text-blue-100 mt-2">Single-page demo using static data, localStorage, OpenLayers, correlation analysis, workflow simulation, document creation/approval, indexing, reporting, lead assignment, and information sharing.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button class="bg-white text-slate-900 px-3 py-2 rounded-lg font-semibold" onclick="resetDemo()">Reset Demo Data</button>
+          <button class="bg-blue-500 hover:bg-blue-400 px-3 py-2 rounded-lg font-semibold" onclick="exportData()">Export JSON</button>
+          <label class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-semibold cursor-pointer">
+            Import JSON
+            <input type="file" accept=".json,application/json" class="hidden" onchange="importData(event)">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6" id="metrics"></div>
+
+    <div class="bg-white rounded-2xl shadow p-4 mb-6">
+      <div class="flex flex-wrap gap-2">
+        <button class="tab-btn active px-4 py-2 rounded-lg border" data-tab="dashboard">Dashboard</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="cases">Cases</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="records">Records & Evidence</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="documents">Documents</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="tasks">Tasks & Leads</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="workflows">Workflow</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="correlation">Correlation & Analytics</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="sharing">Info Sharing</button>
+        <button class="tab-btn px-4 py-2 rounded-lg border" data-tab="reports">Reports</button>
+      </div>
+    </div>
+
+    <section id="tab-dashboard" class="tab-panel">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="xl:col-span-2 bg-white rounded-2xl shadow p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 class="text-xl font-bold">Interactive Map</h2>
+              <p class="text-sm text-slate-500">Click case points to view details. Toggle USA view and world view.</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="px-3 py-2 rounded-lg border bg-blue-50" onclick="zoomUsa()">USA View</button>
+              <button class="px-3 py-2 rounded-lg border bg-blue-50" onclick="zoomWorld()">World View</button>
+              <button class="px-3 py-2 rounded-lg border bg-blue-50" onclick="fitAllCases()">Fit All Cases</button>
+            </div>
+          </div>
+          <div id="map" class="w-full h-[520px] rounded-xl border"></div>
+        </div>
+        <div class="space-y-4">
+          <div class="bg-white rounded-2xl shadow p-4">
+            <h3 class="text-lg font-bold mb-3">Global Search / Index</h3>
+            <div class="space-y-2">
+              <input id="globalSearch" class="w-full border rounded-lg px-3 py-2" placeholder="Search case ID, title, tags, subjects, locations, evidence, doc type..." />
+              <select id="globalFilterType" class="w-full border rounded-lg px-3 py-2">
+                <option value="all">All Objects</option>
+                <option value="cases">Cases</option>
+                <option value="evidence">Evidence</option>
+                <option value="records">Records</option>
+                <option value="documents">Documents</option>
+                <option value="tasks">Tasks</option>
+              </select>
+              <button class="w-full bg-blue-700 hover:bg-blue-600 text-white px-3 py-2 rounded-lg font-semibold" onclick="runGlobalSearch()">Run Indexed Search</button>
+            </div>
+            <div id="globalSearchResults" class="mt-3 max-h-72 overflow-auto text-sm space-y-2"></div>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow p-4">
+            <h3 class="text-lg font-bold mb-3">Quick Add Case</h3>
+            <div class="grid grid-cols-1 gap-2">
+              <input id="newCaseTitle" class="border rounded-lg px-3 py-2" placeholder="Case title" />
+              <input id="newCaseType" class="border rounded-lg px-3 py-2" placeholder="Case type (Fraud, Cyber, Counterintel...)" />
+              <input id="newCaseOffice" class="border rounded-lg px-3 py-2" placeholder="Field office" />
+              <input id="newCaseLat" class="border rounded-lg px-3 py-2" placeholder="Latitude" />
+              <input id="newCaseLon" class="border rounded-lg px-3 py-2" placeholder="Longitude" />
+              <button class="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-3 py-2 font-semibold" onclick="addCase()">Add Case</button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow p-4">
+            <h3 class="text-lg font-bold mb-3">Field Reference</h3>
+            <div class="text-sm space-y-2">
+              <p><strong>Priority</strong><span class="help-dot" onclick="openHelp('Priority indicates urgency and mission impact. P1 is highest. Use it to drive lead assignment, review queues, and escalation.')">i</span></p>
+              <p><strong>Classification</strong><span class="help-dot" onclick="openHelp('This demo uses unclassified labels only. In a real system, access controls and audit policies would protect case content by clearance and need-to-know.')">i</span></p>
+              <p><strong>Lead Office</strong><span class="help-dot" onclick="openHelp('Lead office is the primary organization responsible for direction, assignment, evidence coordination, reporting, and approvals for the case.')">i</span></p>
+              <p><strong>Correlation Score</strong><span class="help-dot" onclick="openHelp('Correlation score is a simulated confidence measure based on shared tags, subjects, locations, and workflow patterns between cases.')">i</span></p>
+              <p><strong>FD-302 / EC</strong><span class="help-dot" onclick="openHelp('This demo simulates interview summaries and electronic communications with draft, review, approve, and finalize states.')">i</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-cases" class="tab-panel hidden">
+      <div class="bg-white rounded-2xl shadow p-4">
+        <div class="flex flex-col lg:flex-row lg:items-end gap-3 justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-bold">Cases</h2>
+            <p class="text-sm text-slate-500">Sortable case management table with click-through details, evidence, records, tasks, and document history.</p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2 w-full lg:w-auto">
+            <input id="caseSearch" class="border rounded-lg px-3 py-2" placeholder="Search cases..." />
+            <select id="caseStatusFilter" class="border rounded-lg px-3 py-2">
+              <option value="all">All Statuses</option>
+              <option>Open</option>
+              <option>Review</option>
+              <option>Closed</option>
+            </select>
+            <select id="caseOfficeFilter" class="border rounded-lg px-3 py-2"></select>
+            <button class="bg-blue-700 hover:bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold" onclick="renderCasesTable()">Apply Filters</button>
+          </div>
+        </div>
+        <div class="overflow-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-100 sticky top-0">
+              <tr>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('id')">Case ID</th>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('title')">Title</th>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('type')">Type</th>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('status')">Status</th>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('priority')">Priority</th>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('office')">Field Office</th>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('leadAgent')">Lead Agent</th>
+                <th class="p-2 text-left cursor-pointer" onclick="sortCases('opened')">Opened</th>
+                <th class="p-2 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="casesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-records" class="tab-panel hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Evidence</h2>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+            <select id="evidenceCaseSelect" class="border rounded-lg px-3 py-2"></select>
+            <input id="evidenceType" class="border rounded-lg px-3 py-2" placeholder="Type" />
+            <input id="evidenceDesc" class="border rounded-lg px-3 py-2" placeholder="Description" />
+            <button class="bg-emerald-600 text-white rounded-lg px-3 py-2 font-semibold" onclick="addEvidence()">Add Evidence</button>
+          </div>
+          <div class="overflow-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="p-2 text-left">Evidence ID</th>
+                  <th class="p-2 text-left">Case</th>
+                  <th class="p-2 text-left">Type</th>
+                  <th class="p-2 text-left">Description</th>
+                  <th class="p-2 text-left">Chain Status</th>
+                  <th class="p-2 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody id="evidenceTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Records / Upload Simulation</h2>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+            <select id="recordCaseSelect" class="border rounded-lg px-3 py-2"></select>
+            <input id="recordName" class="border rounded-lg px-3 py-2" placeholder="File / Record name" />
+            <select id="recordCategory" class="border rounded-lg px-3 py-2">
+              <option>Interview</option>
+              <option>Financial</option>
+              <option>Digital</option>
+              <option>Photo</option>
+              <option>Travel</option>
+            </select>
+            <button class="bg-emerald-600 text-white rounded-lg px-3 py-2 font-semibold" onclick="addRecord()">Add Record</button>
+          </div>
+          <div class="overflow-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="p-2 text-left">Record ID</th>
+                  <th class="p-2 text-left">Case</th>
+                  <th class="p-2 text-left">Name</th>
+                  <th class="p-2 text-left">Category</th>
+                  <th class="p-2 text-left">Indexed</th>
+                  <th class="p-2 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-documents" class="tab-panel hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Create Document</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <select id="docCaseSelect" class="border rounded-lg px-3 py-2"></select>
+            <select id="docType" class="border rounded-lg px-3 py-2">
+              <option>FD-302</option>
+              <option>EC</option>
+              <option>Lead Memo</option>
+              <option>Analyst Note</option>
+            </select>
+            <input id="docTitle" class="border rounded-lg px-3 py-2 md:col-span-2" placeholder="Document title" />
+            <textarea id="docSummary" class="border rounded-lg px-3 py-2 md:col-span-2 h-32" placeholder="Summary / narrative"></textarea>
+            <button class="bg-emerald-600 text-white rounded-lg px-3 py-2 font-semibold md:col-span-2" onclick="addDocument()">Create Document</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Document Approval Queue</h2>
+          <div class="overflow-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="p-2 text-left">Doc ID</th>
+                  <th class="p-2 text-left">Case</th>
+                  <th class="p-2 text-left">Type</th>
+                  <th class="p-2 text-left">Title</th>
+                  <th class="p-2 text-left">Status</th>
+                  <th class="p-2 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="documentsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-tasks" class="tab-panel hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Lead / Task Assignment</h2>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+            <select id="taskCaseSelect" class="border rounded-lg px-3 py-2"></select>
+            <input id="taskTitle" class="border rounded-lg px-3 py-2" placeholder="Task / Lead title" />
+            <input id="taskAssignee" class="border rounded-lg px-3 py-2" placeholder="Assigned to" />
+            <button class="bg-emerald-600 text-white rounded-lg px-3 py-2 font-semibold" onclick="addTask()">Create Lead/Task</button>
+          </div>
+          <div class="overflow-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="p-2 text-left">Task ID</th>
+                  <th class="p-2 text-left">Case</th>
+                  <th class="p-2 text-left">Title</th>
+                  <th class="p-2 text-left">Assignee</th>
+                  <th class="p-2 text-left">Status</th>
+                  <th class="p-2 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody id="tasksTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Lead Assignment Summary</h2>
+          <div id="leadSummary" class="space-y-2 text-sm"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-workflows" class="tab-panel hidden">
+      <div class="bg-white rounded-2xl shadow p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-xl font-bold">Workflow Simulation</h2>
+            <p class="text-sm text-slate-500">Simulated end-to-end movement from intake to closure.</p>
+          </div>
+          <button class="bg-blue-700 hover:bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold" onclick="advanceAllWorkflows()">Advance All Cases One Step</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4" id="workflowBoard"></div>
+      </div>
+    </section>
+
+    <section id="tab-correlation" class="tab-panel hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="xl:col-span-2 bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Case Correlation</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+            <select id="corrCaseA" class="border rounded-lg px-3 py-2"></select>
+            <select id="corrCaseB" class="border rounded-lg px-3 py-2"></select>
+          </div>
+          <button class="bg-blue-700 hover:bg-blue-600 text-white rounded-lg px-3 py-2 font-semibold mb-4" onclick="compareCases()">Compare Cases</button>
+          <div id="correlationDetail" class="text-sm space-y-2"></div>
+          <div class="mt-4">
+            <h3 class="font-bold mb-2">Suggested Linked Cases</h3>
+            <div id="correlationSuggestions" class="space-y-2"></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Analytics</h2>
+          <div id="analyticsPanel" class="space-y-3 text-sm"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-sharing" class="tab-panel hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Information Sharing Queue</h2>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+            <select id="shareCaseSelect" class="border rounded-lg px-3 py-2"></select>
+            <input id="shareOrg" class="border rounded-lg px-3 py-2" placeholder="External org / office" />
+            <input id="shareReason" class="border rounded-lg px-3 py-2" placeholder="Reason / note" />
+            <button class="bg-emerald-600 text-white rounded-lg px-3 py-2 font-semibold" onclick="addShare()">Create Share Request</button>
+          </div>
+          <div class="overflow-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="p-2 text-left">Share ID</th>
+                  <th class="p-2 text-left">Case</th>
+                  <th class="p-2 text-left">Organization</th>
+                  <th class="p-2 text-left">Status</th>
+                  <th class="p-2 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody id="sharingTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Sharing Notes</h2>
+          <div class="text-sm space-y-2">
+            <p>This simulator models request, review, approve, and transmitted states.</p>
+            <p>It uses local static data only and does not call any live systems.</p>
+            <p>Use the action buttons to approve or transmit requests and observe reports/metrics update.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-reports" class="tab-panel hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Operational Reports</h2>
+          <div class="space-y-2">
+            <button class="w-full text-left px-3 py-2 rounded-lg border bg-slate-50 hover:bg-slate-100" onclick="generateReport('overview')">Generate Case Overview Report</button>
+            <button class="w-full text-left px-3 py-2 rounded-lg border bg-slate-50 hover:bg-slate-100" onclick="generateReport('workload')">Generate Field Office Workload Report</button>
+            <button class="w-full text-left px-3 py-2 rounded-lg border bg-slate-50 hover:bg-slate-100" onclick="generateReport('documents')">Generate Document Approval Report</button>
+            <button class="w-full text-left px-3 py-2 rounded-lg border bg-slate-50 hover:bg-slate-100" onclick="generateReport('sharing')">Generate Info Sharing Report</button>
+            <button class="w-full text-left px-3 py-2 rounded-lg border bg-slate-50 hover:bg-slate-100" onclick="generateReport('evidence')">Generate Evidence Status Report</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-4">
+          <h2 class="text-xl font-bold mb-3">Report Output</h2>
+          <div id="reportOutput" class="text-sm whitespace-pre-wrap bg-slate-50 rounded-xl p-3 min-h-[300px] border"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="overlayContainer" class="ol-popup hidden"></div>
+
+  <div id="modal" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+    <div class="bg-white max-w-3xl w-full rounded-2xl shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between p-4 border-b bg-slate-50">
+        <h3 id="modalTitle" class="text-xl font-bold">Details</h3>
+        <button class="px-3 py-1 rounded-lg border" onclick="closeModal()">Close</button>
+      </div>
+      <div id="modalBody" class="p-4 max-h-[75vh] overflow-auto"></div>
+    </div>
+  </div>
+
+  <div id="helpModal" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+    <div class="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between p-4 border-b bg-blue-50">
+        <h3 class="text-lg font-bold">Field Information</h3>
+        <button class="px-3 py-1 rounded-lg border" onclick="closeHelp()">Close</button>
+      </div>
+      <div id="helpBody" class="p-4 text-sm"></div>
+    </div>
+  </div>
+
+<script>
+const STORAGE_KEY = 'cms_openlayers_full_demo_v1';
+
+const seedData = {
+  counters: { case: 1006, evidence: 5006, record: 7006, document: 9006, task: 8006, share: 6006 },
+  workflowStages: ['Intake', 'Assessment', 'Active Investigation', 'Review', 'Closed'],
+  cases: [
+    {
+      id: 'C-1001', title: 'Financial Fraud Ring', type: 'Fraud', status: 'Open', priority: 'P1',
+      office: 'Washington Field Office', leadAgent: 'SA Morgan', opened: '2026-03-02',
+      workflowStage: 'Active Investigation', lat: 38.9072, lon: -77.0369,
+      tags: ['shell-company','wire','dc','banking'], subjects: ['A. Cole','Vantage Holdings'], region: 'USA',
+      summary: 'Multi-state financial fraud investigation with shell companies and coordinated transfers.',
+      classification: 'Unclassified Demo', links: ['C-1002','C-1005']
+    },
+    {
+      id: 'C-1002', title: 'Cyber Intrusion Campaign', type: 'Cyber', status: 'Review', priority: 'P1',
+      office: 'Los Angeles Field Office', leadAgent: 'SA Rivera', opened: '2026-02-18',
+      workflowStage: 'Review', lat: 34.0522, lon: -118.2437,
+      tags: ['credential','phishing','cloud','malware'], subjects: ['Orchid Team','Node 7'], region: 'USA',
+      summary: 'Credential theft and cloud account takeover activity traced across multiple endpoints.',
+      classification: 'Unclassified Demo', links: ['C-1001','C-1003']
+    },
+    {
+      id: 'C-1003', title: 'International Procurement Network', type: 'Counterintel', status: 'Open', priority: 'P2',
+      office: 'New York Field Office', leadAgent: 'SA Bennett', opened: '2026-01-29',
+      workflowStage: 'Assessment', lat: 48.8566, lon: 2.3522,
+      tags: ['export','front-company','travel','procurement'], subjects: ['P. Laurent','Blue Arc'], region: 'World',
+      summary: 'Procurement links involving front entities and cross-border travel patterns.',
+      classification: 'Unclassified Demo', links: ['C-1002']
+    },
+    {
+      id: 'C-1004', title: 'Port Security Lead', type: 'Public Corruption', status: 'Closed', priority: 'P3',
+      office: 'Miami Field Office', leadAgent: 'SA Turner', opened: '2025-12-17',
+      workflowStage: 'Closed', lat: 25.7617, lon: -80.1918,
+      tags: ['port','shipping','vendor'], subjects: ['M. Diaz'], region: 'USA',
+      summary: 'Vendor payment and access anomalies tied to port contracting activity.',
+      classification: 'Unclassified Demo', links: []
+    },
+    {
+      id: 'C-1005', title: 'Travel Pattern Exploitation', type: 'Counterterrorism', status: 'Open', priority: 'P1',
+      office: 'Chicago Field Office', leadAgent: 'SA Patel', opened: '2026-03-20',
+      workflowStage: 'Intake', lat: 41.8781, lon: -87.6298,
+      tags: ['travel','watchlist','coordination'], subjects: ['R. Hale','Unknown 12'], region: 'USA',
+      summary: 'Travel coordination and suspicious itinerary overlaps requiring rapid lead assignment.',
+      classification: 'Unclassified Demo', links: ['C-1001']
+    }
+  ],
+  evidence: [
+    { id:'E-5001', caseId:'C-1001', type:'Financial Ledger', description:'Redacted ledger extract from shell entity', chainStatus:'Logged', notes:'Awaiting forensic review' },
+    { id:'E-5002', caseId:'C-1002', type:'Disk Image', description:'Endpoint image from compromised laptop', chainStatus:'Analyzed', notes:'Malware indicators extracted' },
+    { id:'E-5003', caseId:'C-1003', type:'Travel Manifest', description:'Flight and rail manifest excerpts', chainStatus:'Logged', notes:'Cross-border pattern under review' },
+    { id:'E-5004', caseId:'C-1004', type:'Vendor Contract', description:'Digitized contract packet', chainStatus:'Archived', notes:'Case closed, retained' },
+    { id:'E-5005', caseId:'C-1005', type:'Ticketing Data', description:'Reservation data snapshot', chainStatus:'Logged', notes:'Pending entity correlation' }
+  ],
+  records: [
+    { id:'R-7001', caseId:'C-1001', name:'interview_alecole.txt', category:'Interview', indexed:true, snippet:'Interview summary mentions cash movement and offshore reference.' },
+    { id:'R-7002', caseId:'C-1002', name:'host_artifacts.zip', category:'Digital', indexed:true, snippet:'Archive contains browser history, process list, and suspicious binaries.' },
+    { id:'R-7003', caseId:'C-1003', name:'travel_receipts.pdf', category:'Travel', indexed:false, snippet:'Unindexed travel receipt packet awaiting OCR/index.' },
+    { id:'R-7004', caseId:'C-1004', name:'port_photos.jpg', category:'Photo', indexed:true, snippet:'Photo package of dock, vendor offices, and delivery timestamps.' },
+    { id:'R-7005', caseId:'C-1005', name:'watchlist_note.docx', category:'Interview', indexed:true, snippet:'Analyst note describing meeting overlap and passenger cluster.' }
+  ],
+  documents: [
+    { id:'D-9001', caseId:'C-1001', type:'FD-302', title:'Interview of A. Cole', summary:'Simulated interview narrative.', status:'Draft', author:'SA Morgan' },
+    { id:'D-9002', caseId:'C-1002', type:'EC', title:'Cloud Intrusion Status Update', summary:'Executive communication on current review.', status:'Supervisor Review', author:'SA Rivera' },
+    { id:'D-9003', caseId:'C-1003', type:'Lead Memo', title:'Export Entity Trace', summary:'Lead memo on front company trace.', status:'Approved', author:'SA Bennett' },
+    { id:'D-9004', caseId:'C-1005', type:'Analyst Note', title:'Travel Overlap Indicators', summary:'Pattern note for lead prioritization.', status:'Finalized', author:'Analyst Chen' }
+  ],
+  tasks: [
+    { id:'T-8001', caseId:'C-1001', title:'Subpoena transfer records', assignee:'SA Morgan', status:'Open', due:'2026-04-24', type:'Lead' },
+    { id:'T-8002', caseId:'C-1002', title:'Validate malware family', assignee:'SSA Hill', status:'In Progress', due:'2026-04-22', type:'Task' },
+    { id:'T-8003', caseId:'C-1003', title:'Contact customs liaison', assignee:'SA Bennett', status:'Open', due:'2026-04-27', type:'Lead' },
+    { id:'T-8004', caseId:'C-1005', title:'Assign airport interview team', assignee:'SA Patel', status:'Open', due:'2026-04-21', type:'Task' }
+  ],
+  shares: [
+    { id:'S-6001', caseId:'C-1002', organization:'CISA', reason:'Incident coordination', status:'Requested' },
+    { id:'S-6002', caseId:'C-1003', organization:'Customs Liaison', reason:'Travel procurement validation', status:'Approved' }
+  ]
+};
+
+let state = loadState();
+let caseSortField = 'id';
+let caseSortAsc = true;
+let map, vectorSource, vectorLayer, overlay, overlayContainer;
+
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return structuredClone(seedData);
+  try { return JSON.parse(raw); } catch(e) { return structuredClone(seedData); }
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function structuredClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+function resetDemo() {
+  if (!confirm('Reset all demo data back to the seeded state?')) return;
+  state = structuredClone(seedData);
+  saveState();
+  initializeAll();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'case-management-demo-export.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importData(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      state = imported;
+      saveState();
+      initializeAll();
+      alert('Import completed.');
+    } catch (e) {
+      alert('Invalid JSON import.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function nextId(prefix, key) {
+  state.counters[key] += 1;
+  return `${prefix}-${state.counters[key]}`;
+}
+
+function openModal(title, html) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = html;
+  const modal = document.getElementById('modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+function closeModal() {
+  const modal = document.getElementById('modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+function openHelp(text) {
+  document.getElementById('helpBody').textContent = text;
+  const el = document.getElementById('helpModal');
+  el.classList.remove('hidden');
+  el.classList.add('flex');
+}
+function closeHelp() {
+  const el = document.getElementById('helpModal');
+  el.classList.add('hidden');
+  el.classList.remove('flex');
+}
+
+function getCaseById(id) { return state.cases.find(c => c.id === id); }
+
+function renderMetrics() {
+  const openCases = state.cases.filter(c => c.status === 'Open').length;
+  const reviewCases = state.cases.filter(c => c.status === 'Review').length;
+  const docsPending = state.documents.filter(d => ['Draft','Supervisor Review'].includes(d.status)).length;
+  const tasksOpen = state.tasks.filter(t => t.status !== 'Completed').length;
+  const html = [
+    {title:'Total Cases', value:state.cases.length, detail:'All active and historical case records in the demo store.'},
+    {title:'Open / Review', value:`${openCases} / ${reviewCases}`, detail:'Tracks operational load and queue pressure.'},
+    {title:'Pending Documents', value:docsPending, detail:'Draft or review-stage FD-302, EC, memos, and notes.'},
+    {title:'Open Tasks', value:tasksOpen, detail:'Leads and tasks awaiting completion or assignment.'}
+  ].map(m => `
+    <div class="metric-card bg-white rounded-2xl shadow p-4">
+      <div class="text-sm text-slate-500">${m.title}</div>
+      <div class="text-3xl font-bold mt-1">${m.value}</div>
+      <div class="text-xs text-slate-500 mt-2">${m.detail}</div>
+    </div>
+  `).join('');
+  document.getElementById('metrics').innerHTML = html;
+}
+
+function populateSelects() {
+  const caseOptions = state.cases.map(c => `<option value="${c.id}">${c.id} - ${c.title}</option>`).join('');
+  const officeOptions = ['<option value="all">All Offices</option>', ...Array.from(new Set(state.cases.map(c=>c.office))).sort().map(o => `<option>${o}</option>`)].join('');
+  ['evidenceCaseSelect','recordCaseSelect','docCaseSelect','taskCaseSelect','shareCaseSelect','corrCaseA','corrCaseB'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = caseOptions;
+  });
+  document.getElementById('caseOfficeFilter').innerHTML = officeOptions;
+}
+
+function renderCasesTable() {
+  const search = document.getElementById('caseSearch').value.toLowerCase().trim();
+  const status = document.getElementById('caseStatusFilter').value;
+  const office = document.getElementById('caseOfficeFilter').value;
+  let items = [...state.cases].filter(c => {
+    const hay = [c.id,c.title,c.type,c.status,c.priority,c.office,c.leadAgent,c.summary,(c.tags||[]).join(' '),(c.subjects||[]).join(' ')].join(' ').toLowerCase();
+    return (!search || hay.includes(search)) &&
+           (status === 'all' || c.status === status) &&
+           (office === 'all' || c.office === office);
+  });
+  items.sort((a,b) => {
+    const av = a[caseSortField] ?? '';
+    const bv = b[caseSortField] ?? '';
+    return caseSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+
+  document.getElementById('casesTableBody').innerHTML = items.map(c => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${c.id}</td>
+      <td class="p-2">${c.title}</td>
+      <td class="p-2">${c.type}</td>
+      <td class="p-2">${badge(c.status)}</td>
+      <td class="p-2">${badge(c.priority)}</td>
+      <td class="p-2">${c.office}</td>
+      <td class="p-2">${c.leadAgent}</td>
+      <td class="p-2">${c.opened}</td>
+      <td class="p-2 space-x-1">
+        <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="viewCaseDetail('${c.id}')">View</button>
+        <button class="px-2 py-1 rounded bg-slate-200" onclick="focusCaseOnMap('${c.id}')">Map</button>
+        <button class="px-2 py-1 rounded bg-amber-200" onclick="advanceCaseWorkflow('${c.id}')">Advance</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function badge(text) {
+  const palette = {
+    'Open':'bg-emerald-100 text-emerald-800',
+    'Review':'bg-amber-100 text-amber-800',
+    'Closed':'bg-slate-200 text-slate-700',
+    'P1':'bg-red-100 text-red-800',
+    'P2':'bg-orange-100 text-orange-800',
+    'P3':'bg-blue-100 text-blue-800',
+    'Draft':'bg-slate-100 text-slate-800',
+    'Supervisor Review':'bg-amber-100 text-amber-800',
+    'Approved':'bg-green-100 text-green-800',
+    'Finalized':'bg-blue-100 text-blue-800',
+    'Requested':'bg-slate-100 text-slate-800',
+    'Transmitted':'bg-blue-100 text-blue-800'
+  };
+  return `<span class="px-2 py-1 rounded-full text-xs font-semibold ${palette[text] || 'bg-slate-100 text-slate-800'}">${text}</span>`;
+}
+
+function sortCases(field) {
+  if (caseSortField === field) caseSortAsc = !caseSortAsc;
+  else { caseSortField = field; caseSortAsc = true; }
+  renderCasesTable();
+}
+
+function addCase() {
+  const title = document.getElementById('newCaseTitle').value.trim();
+  const type = document.getElementById('newCaseType').value.trim();
+  const office = document.getElementById('newCaseOffice').value.trim();
+  const lat = parseFloat(document.getElementById('newCaseLat').value);
+  const lon = parseFloat(document.getElementById('newCaseLon').value);
+  if (!title || !type || !office || Number.isNaN(lat) || Number.isNaN(lon)) {
+    alert('Enter title, type, office, latitude, and longitude.');
+    return;
+  }
+  const id = nextId('C', 'case');
+  state.cases.push({
+    id, title, type, office, lat, lon,
+    status:'Open', priority:'P2', leadAgent:'Unassigned', opened:new Date().toISOString().slice(0,10),
+    workflowStage:'Intake', tags:[type.toLowerCase()], subjects:[], region: 'USA', summary:'Newly created demo case.', classification:'Unclassified Demo', links:[]
+  });
+  saveState();
+  initializeAll();
+  document.getElementById('newCaseTitle').value = '';
+  document.getElementById('newCaseType').value = '';
+  document.getElementById('newCaseOffice').value = '';
+  document.getElementById('newCaseLat').value = '';
+  document.getElementById('newCaseLon').value = '';
+}
+
+function viewCaseDetail(caseId) {
+  const c = getCaseById(caseId);
+  const ev = state.evidence.filter(e => e.caseId === caseId);
+  const rec = state.records.filter(r => r.caseId === caseId);
+  const docs = state.documents.filter(d => d.caseId === caseId);
+  const tasks = state.tasks.filter(t => t.caseId === caseId);
+  const shares = state.shares.filter(s => s.caseId === caseId);
+  openModal(`${c.id} - ${c.title}`, `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+      <div class="space-y-2">
+        <div><strong>Type:</strong> ${c.type}</div>
+        <div><strong>Status:</strong> ${badge(c.status)}</div>
+        <div><strong>Priority:</strong> ${badge(c.priority)}</div>
+        <div><strong>Lead Office:</strong> ${c.office}</div>
+        <div><strong>Lead Agent:</strong> ${c.leadAgent}</div>
+        <div><strong>Opened:</strong> ${c.opened}</div>
+        <div><strong>Workflow:</strong> ${c.workflowStage}</div>
+        <div><strong>Subjects:</strong> ${(c.subjects||[]).join(', ') || 'None'}</div>
+        <div><strong>Tags:</strong> ${(c.tags||[]).join(', ') || 'None'}</div>
+        <div><strong>Linked Cases:</strong> ${(c.links||[]).map(id => `<button class="underline text-blue-700" onclick="viewCaseDetail('${id}')">${id}</button>`).join(', ') || 'None'}</div>
+      </div>
+      <div class="space-y-2">
+        <div><strong>Summary:</strong> ${c.summary}</div>
+        <div><strong>Classification:</strong> ${c.classification}</div>
+        <div><strong>Coordinates:</strong> ${c.lat}, ${c.lon}</div>
+        <div><strong>Evidence Count:</strong> ${ev.length}</div>
+        <div><strong>Records Count:</strong> ${rec.length}</div>
+        <div><strong>Documents Count:</strong> ${docs.length}</div>
+        <div><strong>Tasks Count:</strong> ${tasks.length}</div>
+        <div><strong>Share Requests:</strong> ${shares.length}</div>
+      </div>
+    </div>
+    <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+      <div>
+        <h4 class="font-bold mb-2">Evidence</h4>
+        <ul class="list-disc pl-5">${ev.map(x => `<li>${x.id} - ${x.type}: ${x.description} (${x.chainStatus})</li>`).join('') || '<li>None</li>'}</ul>
+      </div>
+      <div>
+        <h4 class="font-bold mb-2">Tasks / Leads</h4>
+        <ul class="list-disc pl-5">${tasks.map(x => `<li>${x.id} - ${x.title} (${x.assignee}, ${x.status})</li>`).join('') || '<li>None</li>'}</ul>
+      </div>
+      <div>
+        <h4 class="font-bold mb-2">Documents</h4>
+        <ul class="list-disc pl-5">${docs.map(x => `<li>${x.id} - ${x.type}: ${x.title} (${x.status})</li>`).join('') || '<li>None</li>'}</ul>
+      </div>
+      <div>
+        <h4 class="font-bold mb-2">Indexed Records</h4>
+        <ul class="list-disc pl-5">${rec.map(x => `<li>${x.id} - ${x.name} (${x.category}, indexed=${x.indexed})</li>`).join('') || '<li>None</li>'}</ul>
+      </div>
+    </div>
+  `);
+}
+
+function addEvidence() {
+  const caseId = document.getElementById('evidenceCaseSelect').value;
+  const type = document.getElementById('evidenceType').value.trim();
+  const description = document.getElementById('evidenceDesc').value.trim();
+  if (!caseId || !type || !description) return alert('Select case and enter type/description.');
+  state.evidence.push({
+    id: nextId('E', 'evidence'),
+    caseId, type, description, chainStatus:'Logged', notes:'Newly added evidence item.'
+  });
+  saveState();
+  renderEvidenceTable();
+  renderMetrics();
+  document.getElementById('evidenceType').value = '';
+  document.getElementById('evidenceDesc').value = '';
+}
+
+function renderEvidenceTable() {
+  document.getElementById('evidenceTableBody').innerHTML = state.evidence.map(e => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${e.id}</td>
+      <td class="p-2">${e.caseId}</td>
+      <td class="p-2">${e.type}</td>
+      <td class="p-2">${e.description}</td>
+      <td class="p-2">${e.chainStatus}</td>
+      <td class="p-2 space-x-1">
+        <button class="px-2 py-1 rounded bg-slate-200" onclick="cycleEvidence('${e.id}')">Advance Chain</button>
+        <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="openModal('Evidence ${e.id}','<div class=&quot;text-sm&quot;><p><strong>Case:</strong> ${e.caseId}</p><p><strong>Type:</strong> ${e.type}</p><p><strong>Description:</strong> ${e.description}</p><p><strong>Status:</strong> ${e.chainStatus}</p><p><strong>Notes:</strong> ${e.notes}</p></div>')">View</button>
+      </td>
+    </tr>
+  `).join('');
+}
+function cycleEvidence(id) {
+  const item = state.evidence.find(x => x.id === id);
+  const steps = ['Logged','Analyzed','Archived'];
+  const idx = steps.indexOf(item.chainStatus);
+  item.chainStatus = steps[(idx + 1) % steps.length];
+  saveState();
+  renderEvidenceTable();
+}
+
+function addRecord() {
+  const caseId = document.getElementById('recordCaseSelect').value;
+  const name = document.getElementById('recordName').value.trim();
+  const category = document.getElementById('recordCategory').value;
+  if (!caseId || !name) return alert('Select case and enter record name.');
+  state.records.push({
+    id: nextId('R', 'record'),
+    caseId, name, category, indexed:false,
+    snippet:'Newly added record pending indexing.'
+  });
+  saveState();
+  renderRecordsTable();
+  document.getElementById('recordName').value = '';
+}
+function renderRecordsTable() {
+  document.getElementById('recordsTableBody').innerHTML = state.records.map(r => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${r.id}</td>
+      <td class="p-2">${r.caseId}</td>
+      <td class="p-2">${r.name}</td>
+      <td class="p-2">${r.category}</td>
+      <td class="p-2">${r.indexed ? badge('Indexed') : '<span class="px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-800">Pending</span>'}</td>
+      <td class="p-2 space-x-1">
+        <button class="px-2 py-1 rounded bg-slate-200" onclick="toggleIndex('${r.id}')">${r.indexed ? 'Unindex' : 'Index'}</button>
+        <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="openModal('Record ${r.id}','<div class=&quot;text-sm&quot;><p><strong>Case:</strong> ${r.caseId}</p><p><strong>Name:</strong> ${r.name}</p><p><strong>Category:</strong> ${r.category}</p><p><strong>Snippet:</strong> ${r.snippet}</p></div>')">View</button>
+      </td>
+    </tr>
+  `).join('');
+}
+function toggleIndex(id) {
+  const r = state.records.find(x => x.id === id);
+  r.indexed = !r.indexed;
+  saveState();
+  renderRecordsTable();
+}
+
+function addDocument() {
+  const caseId = document.getElementById('docCaseSelect').value;
+  const type = document.getElementById('docType').value;
+  const title = document.getElementById('docTitle').value.trim();
+  const summary = document.getElementById('docSummary').value.trim();
+  if (!caseId || !title || !summary) return alert('Select case and enter document title/summary.');
+  const c = getCaseById(caseId);
+  state.documents.push({
+    id: nextId('D', 'document'),
+    caseId, type, title, summary, status:'Draft', author:c.leadAgent
+  });
+  saveState();
+  renderDocumentsTable();
+  renderMetrics();
+  document.getElementById('docTitle').value = '';
+  document.getElementById('docSummary').value = '';
+}
+function renderDocumentsTable() {
+  document.getElementById('documentsTableBody').innerHTML = state.documents.map(d => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${d.id}</td>
+      <td class="p-2">${d.caseId}</td>
+      <td class="p-2">${d.type}</td>
+      <td class="p-2">${d.title}</td>
+      <td class="p-2">${badge(d.status)}</td>
+      <td class="p-2 space-x-1">
+        <button class="px-2 py-1 rounded bg-slate-200" onclick="advanceDocument('${d.id}')">Advance</button>
+        <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="openModal('Document ${d.id}','<div class=&quot;text-sm space-y-2&quot;><p><strong>Case:</strong> ${d.caseId}</p><p><strong>Type:</strong> ${d.type}</p><p><strong>Title:</strong> ${d.title}</p><p><strong>Status:</strong> ${d.status}</p><p><strong>Author:</strong> ${d.author}</p><p><strong>Summary:</strong> ${d.summary}</p></div>')">View</button>
+      </td>
+    </tr>
+  `).join('');
+}
+function advanceDocument(id) {
+  const d = state.documents.find(x => x.id === id);
+  const steps = ['Draft','Supervisor Review','Approved','Finalized'];
+  d.status = steps[(steps.indexOf(d.status) + 1) % steps.length];
+  saveState();
+  renderDocumentsTable();
+  renderMetrics();
+}
+
+function addTask() {
+  const caseId = document.getElementById('taskCaseSelect').value;
+  const title = document.getElementById('taskTitle').value.trim();
+  const assignee = document.getElementById('taskAssignee').value.trim();
+  if (!caseId || !title || !assignee) return alert('Select case and enter task title/assignee.');
+  state.tasks.push({
+    id: nextId('T', 'task'),
+    caseId, title, assignee, status:'Open', due:new Date(Date.now()+1000*60*60*24*7).toISOString().slice(0,10), type:'Lead'
+  });
+  saveState();
+  renderTasksTable();
+  renderLeadSummary();
+  renderMetrics();
+  document.getElementById('taskTitle').value = '';
+  document.getElementById('taskAssignee').value = '';
+}
+function renderTasksTable() {
+  document.getElementById('tasksTableBody').innerHTML = state.tasks.map(t => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${t.id}</td>
+      <td class="p-2">${t.caseId}</td>
+      <td class="p-2">${t.title}</td>
+      <td class="p-2">${t.assignee}</td>
+      <td class="p-2">${badge(t.status)}</td>
+      <td class="p-2 space-x-1">
+        <button class="px-2 py-1 rounded bg-slate-200" onclick="advanceTask('${t.id}')">Advance</button>
+        <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="openModal('Task ${t.id}','<div class=&quot;text-sm&quot;><p><strong>Case:</strong> ${t.caseId}</p><p><strong>Title:</strong> ${t.title}</p><p><strong>Assignee:</strong> ${t.assignee}</p><p><strong>Status:</strong> ${t.status}</p><p><strong>Due:</strong> ${t.due}</p><p><strong>Type:</strong> ${t.type}</p></div>')">View</button>
+      </td>
+    </tr>
+  `).join('');
+}
+function advanceTask(id) {
+  const t = state.tasks.find(x => x.id === id);
+  const steps = ['Open','In Progress','Completed'];
+  t.status = steps[(steps.indexOf(t.status) + 1) % steps.length];
+  saveState();
+  renderTasksTable();
+  renderLeadSummary();
+  renderMetrics();
+}
+function renderLeadSummary() {
+  const byAssignee = {};
+  state.tasks.forEach(t => {
+    if (!byAssignee[t.assignee]) byAssignee[t.assignee] = {total:0, open:0, inProgress:0, completed:0};
+    byAssignee[t.assignee].total++;
+    if (t.status === 'Open') byAssignee[t.assignee].open++;
+    if (t.status === 'In Progress') byAssignee[t.assignee].inProgress++;
+    if (t.status === 'Completed') byAssignee[t.assignee].completed++;
+  });
+  document.getElementById('leadSummary').innerHTML = Object.entries(byAssignee).map(([k,v]) => `
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div class="font-bold">${k}</div>
+      <div>Total: ${v.total}</div>
+      <div>Open: ${v.open} | In Progress: ${v.inProgress} | Completed: ${v.completed}</div>
+    </div>
+  `).join('') || '<div class="text-slate-500">No tasks assigned.</div>';
+}
+
+function renderWorkflowBoard() {
+  const stages = state.workflowStages;
+  const html = stages.map(stage => {
+    const items = state.cases.filter(c => c.workflowStage === stage);
+    return `
+      <div class="kanban-col rounded-2xl bg-slate-50 border p-3">
+        <div class="font-bold mb-3">${stage}</div>
+        <div class="space-y-2">
+          ${items.map(c => `
+            <div class="bg-white rounded-xl p-3 shadow-sm border">
+              <div class="font-semibold">${c.id}</div>
+              <div class="text-sm">${c.title}</div>
+              <div class="text-xs text-slate-500 mt-1">${c.office}</div>
+              <div class="mt-2 flex gap-2">
+                <button class="text-xs px-2 py-1 rounded bg-blue-600 text-white" onclick="viewCaseDetail('${c.id}')">View</button>
+                <button class="text-xs px-2 py-1 rounded bg-amber-200" onclick="advanceCaseWorkflow('${c.id}')">Advance</button>
+              </div>
+            </div>
+          `).join('') || '<div class="text-sm text-slate-400">No cases</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('workflowBoard').innerHTML = html;
+}
+function advanceCaseWorkflow(caseId) {
+  const c = getCaseById(caseId);
+  const steps = state.workflowStages;
+  let idx = steps.indexOf(c.workflowStage);
+  idx = (idx + 1) % steps.length;
+  c.workflowStage = steps[idx];
+  c.status = c.workflowStage === 'Closed' ? 'Closed' : (c.workflowStage === 'Review' ? 'Review' : 'Open');
+  saveState();
+  renderCasesTable();
+  renderWorkflowBoard();
+  renderMetrics();
+}
+function advanceAllWorkflows() {
+  state.cases.forEach(c => {
+    let idx = state.workflowStages.indexOf(c.workflowStage);
+    idx = (idx + 1) % state.workflowStages.length;
+    c.workflowStage = state.workflowStages[idx];
+    c.status = c.workflowStage === 'Closed' ? 'Closed' : (c.workflowStage === 'Review' ? 'Review' : 'Open');
+  });
+  saveState();
+  initializeAll();
+}
+
+function correlationScore(a,b) {
+  let score = 0;
+  const sharedTags = (a.tags||[]).filter(x => (b.tags||[]).includes(x));
+  const sharedSubjects = (a.subjects||[]).filter(x => (b.subjects||[]).includes(x));
+  score += sharedTags.length * 20;
+  score += sharedSubjects.length * 25;
+  if (a.office === b.office) score += 10;
+  if (a.type === b.type) score += 10;
+  const dist = haversine(a.lat,a.lon,b.lat,b.lon);
+  if (dist < 300) score += 15;
+  else if (dist < 1000) score += 8;
+  if ((a.links||[]).includes(b.id) || (b.links||[]).includes(a.id)) score += 20;
+  return { score: Math.min(score, 100), sharedTags, sharedSubjects, distanceKm: Math.round(dist) };
+}
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const aa = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(aa), Math.sqrt(1-aa));
+}
+function compareCases() {
+  const a = getCaseById(document.getElementById('corrCaseA').value);
+  const b = getCaseById(document.getElementById('corrCaseB').value);
+  const res = correlationScore(a,b);
+  document.getElementById('correlationDetail').innerHTML = `
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div><strong>Case A:</strong> ${a.id} - ${a.title}</div>
+      <div><strong>Case B:</strong> ${b.id} - ${b.title}</div>
+      <div class="mt-2"><strong>Correlation Score:</strong> ${res.score}/100</div>
+      <div><strong>Shared Tags:</strong> ${res.sharedTags.join(', ') || 'None'}</div>
+      <div><strong>Shared Subjects:</strong> ${res.sharedSubjects.join(', ') || 'None'}</div>
+      <div><strong>Distance:</strong> ${res.distanceKm} km</div>
+      <div><strong>Interpretation:</strong> ${res.score >= 60 ? 'Strong suggested linkage' : res.score >= 30 ? 'Moderate similarity worth analyst review' : 'Low similarity from current signals'}</div>
+    </div>
+  `;
+}
+function renderCorrelationSuggestions() {
+  const suggestions = [];
+  for (let i=0;i<state.cases.length;i++) {
+    for (let j=i+1;j<state.cases.length;j++) {
+      const a = state.cases[i], b = state.cases[j];
+      const res = correlationScore(a,b);
+      if (res.score >= 30) suggestions.push({a,b,res});
+    }
+  }
+  suggestions.sort((x,y)=>y.res.score-x.res.score);
+  document.getElementById('correlationSuggestions').innerHTML = suggestions.slice(0,8).map(s => `
+    <div class="border rounded-xl p-3 bg-slate-50 text-sm">
+      <div class="font-semibold">${s.a.id} ↔ ${s.b.id}</div>
+      <div>${s.a.title} / ${s.b.title}</div>
+      <div>Score: ${s.res.score} | Shared tags: ${s.res.sharedTags.join(', ') || 'None'} | Distance: ${s.res.distanceKm} km</div>
+    </div>
+  `).join('') || '<div class="text-slate-500">No notable suggested linkages.</div>';
+}
+function renderAnalyticsPanel() {
+  const byOffice = {};
+  state.cases.forEach(c => byOffice[c.office] = (byOffice[c.office] || 0) + 1);
+  const topOffice = Object.entries(byOffice).sort((a,b)=>b[1]-a[1])[0];
+  const indexedCount = state.records.filter(r => r.indexed).length;
+  const pendingDocs = state.documents.filter(d => d.status !== 'Finalized').length;
+  const approvedShares = state.shares.filter(s => s.status === 'Approved' || s.status === 'Transmitted').length;
+  document.getElementById('analyticsPanel').innerHTML = `
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div class="font-semibold">Cases by Office</div>
+      <div class="mt-2 space-y-1">${Object.entries(byOffice).map(([k,v]) => `<div>${k}: ${v}</div>`).join('')}</div>
+    </div>
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div class="font-semibold">Top Workload Office</div>
+      <div class="mt-2">${topOffice ? `${topOffice[0]} (${topOffice[1]} cases)` : 'N/A'}</div>
+    </div>
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div class="font-semibold">Index Coverage</div>
+      <div class="mt-2">${indexedCount} / ${state.records.length} records indexed</div>
+    </div>
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div class="font-semibold">Pending Documents</div>
+      <div class="mt-2">${pendingDocs}</div>
+    </div>
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div class="font-semibold">Approved / Transmitted Shares</div>
+      <div class="mt-2">${approvedShares} / ${state.shares.length}</div>
+    </div>
+  `;
+}
+
+function addShare() {
+  const caseId = document.getElementById('shareCaseSelect').value;
+  const org = document.getElementById('shareOrg').value.trim();
+  const reason = document.getElementById('shareReason').value.trim();
+  if (!caseId || !org || !reason) return alert('Select case and enter organization/reason.');
+  state.shares.push({ id: nextId('S', 'share'), caseId, organization: org, reason, status:'Requested' });
+  saveState();
+  renderSharingTable();
+  document.getElementById('shareOrg').value = '';
+  document.getElementById('shareReason').value = '';
+}
+function renderSharingTable() {
+  document.getElementById('sharingTableBody').innerHTML = state.shares.map(s => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${s.id}</td>
+      <td class="p-2">${s.caseId}</td>
+      <td class="p-2">${s.organization}</td>
+      <td class="p-2">${badge(s.status)}</td>
+      <td class="p-2 space-x-1">
+        <button class="px-2 py-1 rounded bg-slate-200" onclick="advanceShare('${s.id}')">Advance</button>
+        <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="openModal('Share ${s.id}','<div class=&quot;text-sm&quot;><p><strong>Case:</strong> ${s.caseId}</p><p><strong>Organization:</strong> ${s.organization}</p><p><strong>Status:</strong> ${s.status}</p><p><strong>Reason:</strong> ${s.reason}</p></div>')">View</button>
+      </td>
+    </tr>
+  `).join('');
+}
+function advanceShare(id) {
+  const s = state.shares.find(x => x.id === id);
+  const steps = ['Requested','Approved','Transmitted'];
+  s.status = steps[(steps.indexOf(s.status)+1)%steps.length];
+  saveState();
+  renderSharingTable();
+  renderAnalyticsPanel();
+}
+
+function generateReport(kind) {
+  let out = '';
+  if (kind === 'overview') {
+    out += 'CASE OVERVIEW REPORT\n\n';
+    state.cases.forEach(c => {
+      out += `${c.id} | ${c.title} | ${c.type} | ${c.status} | ${c.office} | ${c.leadAgent}\n`;
+    });
+  } else if (kind === 'workload') {
+    out += 'FIELD OFFICE WORKLOAD REPORT\n\n';
+    const offices = {};
+    state.cases.forEach(c => offices[c.office] = (offices[c.office] || 0) + 1);
+    Object.entries(offices).sort((a,b)=>b[1]-a[1]).forEach(([office,count]) => out += `${office}: ${count} case(s)\n`);
+  } else if (kind === 'documents') {
+    out += 'DOCUMENT APPROVAL REPORT\n\n';
+    state.documents.forEach(d => out += `${d.id} | ${d.caseId} | ${d.type} | ${d.status} | ${d.title}\n`);
+  } else if (kind === 'sharing') {
+    out += 'INFO SHARING REPORT\n\n';
+    state.shares.forEach(s => out += `${s.id} | ${s.caseId} | ${s.organization} | ${s.status} | ${s.reason}\n`);
+  } else if (kind === 'evidence') {
+    out += 'EVIDENCE STATUS REPORT\n\n';
+    state.evidence.forEach(e => out += `${e.id} | ${e.caseId} | ${e.type} | ${e.chainStatus} | ${e.description}\n`);
+  }
+  document.getElementById('reportOutput').textContent = out;
+}
+
+function runGlobalSearch() {
+  const q = document.getElementById('globalSearch').value.toLowerCase().trim();
+  const type = document.getElementById('globalFilterType').value;
+  let results = [];
+  const pushMatches = (kind, items, mapper) => {
+    items.forEach(item => {
+      const hay = mapper(item).toLowerCase();
+      if (!q || hay.includes(q)) results.push({kind, item, preview: mapper(item)});
+    });
+  };
+  if (type === 'all' || type === 'cases') pushMatches('Case', state.cases, c => `${c.id} ${c.title} ${c.type} ${c.office} ${(c.tags||[]).join(' ')} ${(c.subjects||[]).join(' ')} ${c.summary}`);
+  if (type === 'all' || type === 'evidence') pushMatches('Evidence', state.evidence, e => `${e.id} ${e.caseId} ${e.type} ${e.description} ${e.notes}`);
+  if (type === 'all' || type === 'records') pushMatches('Record', state.records, r => `${r.id} ${r.caseId} ${r.name} ${r.category} ${r.snippet}`);
+  if (type === 'all' || type === 'documents') pushMatches('Document', state.documents, d => `${d.id} ${d.caseId} ${d.type} ${d.title} ${d.summary} ${d.status}`);
+  if (type === 'all' || type === 'tasks') pushMatches('Task', state.tasks, t => `${t.id} ${t.caseId} ${t.title} ${t.assignee} ${t.status} ${t.type}`);
+
+  const box = document.getElementById('globalSearchResults');
+  if (!results.length) {
+    box.innerHTML = '<div class="text-slate-500">No indexed matches found.</div>';
+    return;
+  }
+  box.innerHTML = results.slice(0,50).map(r => `
+    <div class="border rounded-xl p-3 bg-slate-50">
+      <div class="font-semibold">${r.kind}</div>
+      <div class="text-xs text-slate-600 mt-1">${r.preview}</div>
+    </div>
+  `).join('');
+}
+
+function initializeMap() {
+  overlayContainer = document.getElementById('overlayContainer');
+  overlay = new ol.Overlay({ element: overlayContainer, autoPan: true, positioning: 'bottom-center', stopEvent: false });
+  vectorSource = new ol.source.Vector();
+  vectorLayer = new ol.layer.Vector({
+    source: vectorSource,
+    style: new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 7,
+        fill: new ol.style.Fill({ color: '#2563eb' }),
+        stroke: new ol.style.Stroke({ color: '#ffffff', width: 2 })
+      })
+    })
+  });
+
+  map = new ol.Map({
+    target: 'map',
+    layers: [
+      new ol.layer.Tile({ source: new ol.source.OSM() }),
+      vectorLayer
+    ],
+    overlays: [overlay],
+    view: new ol.View({
+      center: ol.proj.fromLonLat([-98.5795, 39.8283]),
+      zoom: 3
+    })
+  });
+
+  map.on('click', function(evt) {
+    let found = false;
+    map.forEachFeatureAtPixel(evt.pixel, function(feature) {
+      found = true;
+      const caseId = feature.get('caseId');
+      const c = getCaseById(caseId);
+      overlayContainer.classList.remove('hidden');
+      overlayContainer.innerHTML = `
+        <div class="text-sm">
+          <div class="font-bold">${c.id}</div>
+          <div>${c.title}</div>
+          <div class="text-slate-500">${c.office}</div>
+          <div class="mt-2 flex gap-2">
+            <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="viewCaseDetail('${c.id}')">Open</button>
+            <button class="px-2 py-1 rounded bg-slate-200" onclick="overlayContainer.classList.add('hidden')">Hide</button>
+          </div>
+        </div>
+      `;
+      overlay.setPosition(feature.getGeometry().getCoordinates());
+    });
+    if (!found) overlayContainer.classList.add('hidden');
+  });
+
+  renderMapFeatures();
+}
+
+function renderMapFeatures() {
+  if (!vectorSource) return;
+  vectorSource.clear();
+  state.cases.forEach(c => {
+    const feature = new ol.Feature({
+      geometry: new ol.geom.Point(ol.proj.fromLonLat([c.lon, c.lat])),
+      caseId: c.id
+    });
+    vectorSource.addFeature(feature);
+  });
+}
+
+function zoomUsa() {
+  map.getView().animate({ center: ol.proj.fromLonLat([-98.5795, 39.8283]), zoom: 3, duration: 600 });
+}
+function zoomWorld() {
+  map.getView().animate({ center: ol.proj.fromLonLat([10, 25]), zoom: 1.8, duration: 600 });
+}
+function fitAllCases() {
+  const extent = vectorSource.getExtent();
+  if (extent && extent.every(Number.isFinite)) map.getView().fit(extent, { padding:[50,50,50,50], maxZoom: 6, duration:600 });
+}
+function focusCaseOnMap(caseId) {
+  const c = getCaseById(caseId);
+  map.getView().animate({ center: ol.proj.fromLonLat([c.lon, c.lat]), zoom: 6, duration: 600 });
+  const coord = ol.proj.fromLonLat([c.lon, c.lat]);
+  overlayContainer.classList.remove('hidden');
+  overlayContainer.innerHTML = `
+    <div class="text-sm">
+      <div class="font-bold">${c.id}</div>
+      <div>${c.title}</div>
+      <div class="text-slate-500">${c.office}</div>
+      <div class="mt-2">
+        <button class="px-2 py-1 rounded bg-blue-600 text-white" onclick="viewCaseDetail('${c.id}')">Open</button>
+      </div>
+    </div>
+  `;
+  overlay.setPosition(coord);
+  activateTab('dashboard');
+}
+
+function advanceCaseStatusByWorkflow(c) {
+  c.status = c.workflowStage === 'Closed' ? 'Closed' : (c.workflowStage === 'Review' ? 'Review' : 'Open');
+}
+
+function activateTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  document.getElementById(`tab-${name}`).classList.remove('hidden');
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${name}"]`).classList.add('active');
+  if (name === 'dashboard' && map) setTimeout(() => map.updateSize(), 50);
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+});
+document.getElementById('caseSearch').addEventListener('input', renderCasesTable);
+document.getElementById('caseStatusFilter').addEventListener('change', renderCasesTable);
+document.getElementById('caseOfficeFilter').addEventListener('change', renderCasesTable);
+
+function initializeAll() {
+  renderMetrics();
+  populateSelects();
+  renderCasesTable();
+  renderEvidenceTable();
+  renderRecordsTable();
+  renderDocumentsTable();
+  renderTasksTable();
+  renderLeadSummary();
+  renderWorkflowBoard();
+  renderCorrelationSuggestions();
+  renderAnalyticsPanel();
+  renderSharingTable();
+  if (!map) initializeMap(); else renderMapFeatures();
+  fitAllCases();
+  compareCases();
+  runGlobalSearch();
+  generateReport('overview');
+  saveState();
+}
+
+window.addEventListener('load', initializeAll);
+</script>
+</body>
+</html>

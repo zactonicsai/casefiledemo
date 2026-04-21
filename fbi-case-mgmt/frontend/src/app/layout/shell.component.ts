@@ -21,7 +21,7 @@ import { AuthService } from '../core/auth.service';
     <mat-sidenav-container class="shell">
       <mat-sidenav mode="side" opened class="sidenav">
         <div class="brand">
-          <div class="seal">SENTINEL</div>
+          <div class="seal">Demo Only</div>
           <div class="brand-sub">Case Management</div>
         </div>
         <mat-nav-list>
@@ -89,5 +89,5 @@ import { AuthService } from '../core/auth.service';
 })
 export class ShellComponent {
   auth = inject(AuthService);
-  pageTitle = () => 'Sentinel';
+  pageTitle = () => 'Demo Only';
 }
