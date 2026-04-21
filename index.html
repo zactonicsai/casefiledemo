@@ -3,10 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Demo Only — Case Management System (Demo)</title>
+<title>SENTINEL — Case Management System (Demo)</title>
 
 <!-- Tailwind (Play CDN — demo-only) -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+
+<!-- OpenLayers -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@9.2.4/ol.css">
+<script src="https://cdn.jsdelivr.net/npm/ol@9.2.4/dist/ol.js"></script>
 
 <!-- Typography -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +19,7 @@
 
 <script>
   tailwind.config = {
+    darkMode: 'class',
     theme: {
       extend: {
         fontFamily: {
@@ -38,8 +43,53 @@
 </script>
 
 <style>
-  :root { color-scheme: light; }
-  html, body { background: #f5f3ea; }
+  :root {
+    color-scheme: light;
+    --bg:         #f5f3ea;
+    --bg-alt:     #faf8f1;
+    --surface:    #ffffff;
+    --text:       #1c1b17;
+    --text-muted: #6b695f;
+    --text-faint: #bcbab3;
+    --border:     #e3dfce;
+    --border-strong: #d9d5c3;
+    --accent:     #c7a35a;
+    --sidebar-bg: #111110;
+    --sidebar-fg: #f5f3ea;
+    --sidebar-muted: #bcbab3;
+    --ink-50:     #f8f7f4;
+    --ink-100:    #eeece3;
+    --ink-200:    #d9d5c3;
+    --classification-bg: #fbe9e7;
+    --classification-fg: #a5332a;
+    --classification-border: #a5332a;
+    --grain-opacity: 0.6;
+    --font-scale: 1;
+  }
+  html.dark {
+    color-scheme: dark;
+    --bg:         #0e0d0b;
+    --bg-alt:     #171612;
+    --surface:    #1a1916;
+    --text:       #ede8d8;
+    --text-muted: #968f7e;
+    --text-faint: #5a5648;
+    --border:     #2a2620;
+    --border-strong: #3a3528;
+    --accent:     #d4b370;
+    --sidebar-bg: #050504;
+    --sidebar-fg: #ede8d8;
+    --sidebar-muted: #968f7e;
+    --ink-50:     #1f1d18;
+    --ink-100:    #242118;
+    --ink-200:    #2a2620;
+    --classification-bg: #2a1210;
+    --classification-fg: #e8948a;
+    --classification-border: #8a2620;
+    --grain-opacity: 0.25;
+  }
+  html { font-size: calc(16px * var(--font-scale)); }
+  html, body { background: var(--bg); color: var(--text); }
 
   /* subtle paper grain */
   body::before {
@@ -50,35 +100,41 @@
     background-size: 3px 3px, 7px 7px;
     background-position: 0 0, 1px 2px;
     mix-blend-mode: multiply;
-    opacity: 0.6;
+    opacity: var(--grain-opacity);
+  }
+  html.dark body::before {
+    background-image:
+      radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px);
+    mix-blend-mode: screen;
   }
   #app > * { position: relative; z-index: 1; }
 
-  /* tabular numerals for case numbers & counts */
   .num, .mono { font-variant-numeric: tabular-nums; }
 
-  /* classification banners — top of every case view */
   .classbanner {
     font-family:'JetBrains Mono',monospace; letter-spacing:0.3em;
     text-align:center; font-weight:700; font-size:11px;
-    padding:6px 8px; color:#a5332a; background:#fbe9e7;
-    border-top:1px solid #a5332a; border-bottom:1px solid #a5332a;
+    padding:6px 8px; color:var(--classification-fg); background:var(--classification-bg);
+    border-top:1px solid var(--classification-border); border-bottom:1px solid var(--classification-border);
   }
 
-  /* stamp component */
   .stamp {
     font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:0.15em;
     border:2px solid currentColor; padding:2px 8px; border-radius:2px;
     display:inline-flex; align-items:center; gap:6px;
     transform: rotate(-1.5deg); text-transform:uppercase; font-size:11px;
   }
-  .stamp-red   { color:#a5332a; background:rgba(165,51,42,0.06); }
-  .stamp-amber { color:#a16207; background:rgba(161,98,7,0.06); }
-  .stamp-green { color:#2f6f3a; background:rgba(47,111,58,0.06); }
-  .stamp-blue  { color:#1a3a6b; background:rgba(26,58,107,0.06); }
-  .stamp-grey  { color:#4b4a46; background:rgba(75,74,70,0.06); }
+  .stamp-red   { color:#a5332a; background:rgba(165,51,42,0.10); }
+  .stamp-amber { color:#a16207; background:rgba(161,98,7,0.10); }
+  .stamp-green { color:#2f6f3a; background:rgba(47,111,58,0.10); }
+  .stamp-blue  { color:#1a3a6b; background:rgba(26,58,107,0.10); }
+  .stamp-grey  { color:var(--text-muted); background:rgba(75,74,70,0.10); }
+  html.dark .stamp-red   { color:#e8948a; background:rgba(232,148,138,0.12); }
+  html.dark .stamp-amber { color:#e0b863; background:rgba(224,184,99,0.12); }
+  html.dark .stamp-green { color:#7bb885; background:rgba(123,184,133,0.12); }
+  html.dark .stamp-blue  { color:#7ba3d4; background:rgba(123,163,212,0.12); }
 
-  /* status badge (inline compact) */
   .badge {
     display:inline-flex; align-items:center; gap:4px;
     font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.1em;
@@ -92,8 +148,14 @@
   .status-CLOSURE_REVIEW   { background:#d4def5; color:#22407a; }
   .status-CLOSED           { background:#e0ddf3; color:#3a327a; }
   .status-ARCHIVED         { background:#e5e4de; color:#4b4a46; }
+  html.dark .status-DRAFT            { background:#2a2620; color:#c2bda8; }
+  html.dark .status-PENDING_APPROVAL { background:#3d2e0f; color:#e0b863; }
+  html.dark .status-OPEN             { background:#1e3524; color:#7bb885; }
+  html.dark .status-SUSPENDED        { background:#3d1f1b; color:#e8948a; }
+  html.dark .status-CLOSURE_REVIEW   { background:#1f2a42; color:#7ba3d4; }
+  html.dark .status-CLOSED           { background:#272240; color:#a4a0d0; }
+  html.dark .status-ARCHIVED         { background:#2a2620; color:#968f7e; }
 
-  /* pipeline badge */
   .pstat-UPLOADED      { background:#e8e4d4; color:#45443e; }
   .pstat-VIRUS_SCANNING{ background:#f7d7d3; color:#8f2b22; }
   .pstat-CONVERTING    { background:#fbe9c5; color:#7a4f0b; }
@@ -101,50 +163,62 @@
   .pstat-OCR_COMPLETE  { background:#d4def5; color:#22407a; }
   .pstat-INDEXED       { background:#d6e9d6; color:#2f6f3a; }
   .pstat-FAILED        { background:#f7c7c1; color:#8f2b22; }
+  html.dark .pstat-UPLOADED      { background:#2a2620; color:#c2bda8; }
+  html.dark .pstat-VIRUS_SCANNING{ background:#3d1f1b; color:#e8948a; }
+  html.dark .pstat-CONVERTING    { background:#3d2e0f; color:#e0b863; }
+  html.dark .pstat-OCR_PENDING   { background:#3d2e0f; color:#e0b863; }
+  html.dark .pstat-OCR_COMPLETE  { background:#1f2a42; color:#7ba3d4; }
+  html.dark .pstat-INDEXED       { background:#1e3524; color:#7bb885; }
+  html.dark .pstat-FAILED        { background:#3d1f1b; color:#e8948a; }
 
-  /* rotation cancel for pagination etc. */
   .no-rotate { transform: none !important; }
 
-  /* sidenav active */
-  .nav-link { position:relative; padding:10px 20px; color:#bcbab3; font-size:13.5px; letter-spacing:0.02em; display:flex; align-items:center; gap:10px; border-left:2px solid transparent; transition: all 0.15s; }
-  .nav-link:hover { color:#fff; background: rgba(255,255,255,0.03); }
-  .nav-link.active { color:#fff; border-left-color:#c7a35a; background: rgba(199,163,90,0.08); }
+  .nav-link { position:relative; padding:10px 20px; color:var(--sidebar-muted); font-size:13.5px; letter-spacing:0.02em; display:flex; align-items:center; gap:10px; border-left:2px solid transparent; transition: all 0.15s; }
+  .nav-link:hover { color:var(--sidebar-fg); background: rgba(255,255,255,0.03); }
+  .nav-link.active { color:var(--sidebar-fg); border-left-color:var(--accent); background: rgba(199,163,90,0.08); }
 
-  /* input polish */
-  .field { display:block; width:100%; border:1px solid #d9d5c3; background:#fff; padding:9px 12px; border-radius:3px; font-size:14px; }
+  .field {
+    display:block; width:100%; border:1px solid var(--border-strong); background:var(--surface);
+    color: var(--text); padding:9px 12px; border-radius:3px; font-size:14px;
+  }
   .field:focus { outline:none; border-color:#2b4b8a; box-shadow:0 0 0 3px rgba(43,75,138,0.15); }
+  html.dark .field:focus { border-color:#7ba3d4; box-shadow:0 0 0 3px rgba(123,163,212,0.2); }
   .field-sm { padding:6px 10px; font-size:13px; }
-  label.lbl { display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:#6b695f; margin-bottom:5px; font-weight:500; }
+  label.lbl {
+    display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted);
+    margin-bottom:5px; font-weight:500;
+  }
 
-  /* buttons */
   .btn      { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13.5px; font-weight:500; letter-spacing:0.01em; border-radius:3px; transition:all 0.15s; cursor:pointer; border:1px solid transparent; white-space:nowrap; }
   .btn-sm   { padding:5px 12px; font-size:12px; }
-  .btn-pri  { background:#1c1b17; color:#f5f3ea; }
-  .btn-pri:hover { background:#2a2824; }
-  .btn-acc  { background:#c7a35a; color:#1c1b17; font-weight:600; }
-  .btn-acc:hover { background:#b7924a; }
-  .btn-out  { background:transparent; color:#1c1b17; border-color:#1c1b17; }
-  .btn-out:hover { background:#1c1b17; color:#f5f3ea; }
-  .btn-ghost{ background:transparent; color:#6b695f; }
-  .btn-ghost:hover { background:rgba(0,0,0,0.04); color:#1c1b17; }
+  .btn-pri  { background:var(--text); color:var(--bg); }
+  .btn-pri:hover { opacity: 0.88; }
+  .btn-acc  { background:var(--accent); color:#1c1b17; font-weight:600; }
+  .btn-acc:hover { filter: brightness(0.93); }
+  .btn-out  { background:transparent; color:var(--text); border-color:var(--text); }
+  .btn-out:hover { background:var(--text); color:var(--bg); }
+  .btn-ghost{ background:transparent; color:var(--text-muted); }
+  .btn-ghost:hover { background:rgba(128,128,128,0.1); color:var(--text); }
   .btn-danger { background:#a5332a; color:#fff; }
   .btn-danger:hover { background:#8a2620; }
   .btn:disabled { opacity:0.4; cursor:not-allowed; }
 
-  /* card surface */
-  .card { background:#fff; border:1px solid #e3dfce; border-radius:4px; box-shadow: 0 1px 2px rgba(17,17,16,0.04); }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:4px; box-shadow: 0 1px 2px rgba(17,17,16,0.04); }
+  html.dark .card { box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
-  /* case number treatment */
   .casenum { font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:0.05em; font-variant-numeric:tabular-nums; }
 
-  /* table */
   table.dossier { width:100%; border-collapse:separate; border-spacing:0; }
-  table.dossier th { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:#6b695f; text-align:left; padding:10px 12px; border-bottom:1px solid #d9d5c3; background:#faf8f1; font-weight:600; }
-  table.dossier td { padding:12px; border-bottom:1px solid #eeece3; font-size:14px; vertical-align:top; }
-  table.dossier tbody tr:hover { background:#faf8f1; cursor:pointer; }
+  table.dossier th {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--text-muted); text-align:left; padding:10px 12px;
+    border-bottom:1px solid var(--border-strong); background:var(--bg-alt); font-weight:600;
+  }
+  table.dossier td { padding:12px; border-bottom:1px solid var(--ink-100); font-size:14px; vertical-align:top; color: var(--text); }
+  table.dossier tbody tr:hover { background:var(--bg-alt); cursor:pointer; }
   table.dossier tbody tr:hover td.no-hover { background:transparent; }
 
-  /* animations */
   @keyframes stamp-in { 0%{ transform: rotate(-15deg) scale(2); opacity:0; } 60%{ transform: rotate(-2deg) scale(1.1); opacity:1; } 100%{ transform: rotate(-1.5deg) scale(1); opacity:1; } }
   .stamp-in { animation: stamp-in 0.4s ease-out; }
   @keyframes fade-up { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
@@ -152,25 +226,30 @@
   @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(43,75,138,0.4);} 70%{box-shadow:0 0 0 10px rgba(43,75,138,0);} 100%{box-shadow:0 0 0 0 rgba(43,75,138,0);} }
   .pulse { animation: pulse-ring 1.5s ease-out infinite; }
 
-  /* toast */
-  #toasts { position:fixed; top:20px; right:20px; z-index:100; display:flex; flex-direction:column; gap:8px; }
+  #toasts { position:fixed; top:20px; right:20px; z-index:100; display:flex; flex-direction:column; gap:8px; max-width: calc(100vw - 40px); }
   .toast { background:#1c1b17; color:#f5f3ea; padding:12px 18px; border-radius:3px; font-size:13.5px; box-shadow:0 10px 30px rgba(0,0,0,0.25); border-left:3px solid #c7a35a; max-width:360px; animation: fade-up 0.25s ease-out; }
   .toast.error { border-left-color:#a5332a; }
   .toast.success { border-left-color:#2f6f3a; }
+  html.dark .toast { background: #ede8d8; color: #1c1b17; }
 
-  /* modal */
   .modal-backdrop { position:fixed; inset:0; background:rgba(17,17,16,0.55); z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; }
-  .modal { background:#f5f3ea; border:1px solid #d9d5c3; border-radius:4px; max-width:600px; width:100%; max-height:90vh; overflow-y:auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  html.dark .modal-backdrop { background: rgba(0,0,0,0.75); }
 
-  /* highlight mark */
+  .upload-file::file-selector-button {
+    margin-right: 12px; padding: 8px 16px; border: none; border-radius: 3px;
+    background: var(--text); color: var(--bg); font-weight: 500;
+    font-family: inherit; cursor: pointer;
+  }
+  .upload-file::file-selector-button:hover { opacity: 0.88; }
+  .modal { background:var(--bg); border:1px solid var(--border-strong); border-radius:4px; max-width:600px; width:100%; max-height:90vh; overflow-y:auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+
   mark { background:#fde68a; color:inherit; padding:0 2px; border-radius:1px; }
+  html.dark mark { background: #7a5e15; color: #fde68a; }
 
-  /* scrollbar polish */
   ::-webkit-scrollbar { width:8px; height:8px; }
-  ::-webkit-scrollbar-thumb { background:#d9d5c3; border-radius:4px; }
-  ::-webkit-scrollbar-thumb:hover { background:#bcbab3; }
+  ::-webkit-scrollbar-thumb { background:var(--border-strong); border-radius:4px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text-faint); }
 
-  /* login screen flourish */
   .login-bg {
     background:
       radial-gradient(ellipse at top left, rgba(199,163,90,0.08) 0%, transparent 50%),
@@ -185,14 +264,91 @@
   .seal-ring::before {
     content:''; position:absolute; inset:6px; border:1px dashed #c7a35a; border-radius:50%;
   }
-  .seal-inner {
-    font-family:'Newsreader', serif; font-size:11px; letter-spacing:0.4em;
-    color:#c7a35a; font-weight:600;
+  .seal-inner { font-family:'Newsreader', serif; font-size:11px; letter-spacing:0.4em; color:#c7a35a; font-weight:600; }
+
+  /* ── Mobile / sidebar ── */
+  .sidebar {
+    width: 240px; background: var(--sidebar-bg); color: var(--sidebar-fg);
+    flex-shrink: 0; display: flex; flex-direction: column;
+    transition: transform 0.22s ease;
   }
+  .mobile-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 50;
+  }
+  @media (max-width: 900px) {
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; z-index: 60; transform: translateX(-100%);
+    }
+    .sidebar.open { transform: translateX(0); box-shadow: 10px 0 40px rgba(0,0,0,0.3); }
+    .mobile-overlay.open { display: block; }
+    .content-pad { padding: 20px !important; }
+    .topbar-title { display: none; }
+    .kbd-hint { display: none; }
+    .meta-grid-m { grid-template-columns: 1fr 1fr !important; }
+  }
+  @media (max-width: 640px) {
+    .hide-sm { display: none !important; }
+    .stat-tile-sm { padding: 14px !important; }
+    .stat-tile-sm .font-display { font-size: 1.75rem !important; }
+    .content-pad { padding: 14px !important; }
+    .table-wrap { overflow-x: auto; }
+    .table-wrap table.dossier { min-width: 720px; }
+    h1.page-h1 { font-size: 1.85rem !important; }
+    .modal { max-height: 95vh; }
+  }
+  .hamburger { display: none; }
+  @media (max-width: 900px) {
+    .hamburger { display: inline-flex; }
+  }
+
+  /* ── OpenLayers map overrides for dark mode ── */
+  .ol-zoom {
+    top: auto; bottom: 12px; right: 12px; left: auto;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 3px;
+  }
+  .ol-zoom button {
+    background: var(--surface); color: var(--text); font-family: 'JetBrains Mono', monospace;
+    border: none; border-bottom: 1px solid var(--border-strong); width: 30px; height: 30px;
+  }
+  .ol-zoom button:last-child { border-bottom: none; }
+  .ol-zoom button:hover, .ol-zoom button:focus { background: var(--bg-alt); }
+  html.dark .ol-tile-layer canvas { filter: brightness(0.7) contrast(1.15) hue-rotate(180deg) invert(0.92); }
+  .ol-attribution { background: rgba(255,255,255,0.8); font-size: 10px; }
+  html.dark .ol-attribution { background: rgba(0,0,0,0.6); color: var(--text); }
+  html.dark .ol-attribution a { color: var(--accent); }
+
+  .map-popup {
+    position: absolute; background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 3px; padding: 12px; min-width: 240px; max-width: 300px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25); transform: translate(-50%, calc(-100% - 16px));
+    pointer-events: auto; color: var(--text);
+  }
+  .map-popup::after {
+    content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent;
+    border-top: 8px solid var(--surface);
+  }
+  .map-popup::before {
+    content: ''; position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent;
+    border-top: 9px solid var(--border-strong);
+  }
+  .map-crosshair { cursor: crosshair !important; }
+
+  .theme-btn {
+    padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 3px;
+    background: var(--surface); color: var(--text); display: inline-flex; align-items: center;
+    gap: 4px; cursor: pointer; font-family:'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .theme-btn:hover { background: var(--bg-alt); }
+
+  /* dark invert for OSM tiles kept subtle */
+  html.dark .ol-viewport { background: #0a0a08; }
 </style>
 </head>
 
-<body class="font-sans text-ink-800">
+<body class="font-sans text-[color:var(--text)]">
 
 <div id="toasts"></div>
 
@@ -257,7 +413,8 @@ const SEED_CASES = [
     assignedAgentId:'agent.smith', supervisorId:'supervisor.jones',
     createdAt:'2026-01-08T14:11:00Z', createdBy:'agent.smith',
     openedAt:'2026-01-12T09:20:00Z', updatedAt:'2026-04-15T18:44:00Z',
-    workflowId:'case-c-001'
+    workflowId:'case-c-001',
+    lat: 40.7580, lon: -73.9855, location:'Midtown Manhattan, NY'
   },
   {
     id: 'c-002', caseNumber:'111-HQ-12345', classificationCode:'111', originatingOffice:'HQ', serialNumber: 12345,
@@ -267,7 +424,8 @@ const SEED_CASES = [
     assignedAgentId:'supervisor.jones', supervisorId:'supervisor.jones',
     createdAt:'2025-12-19T10:00:00Z', createdBy:'supervisor.jones',
     openedAt:'2025-12-22T14:00:00Z', updatedAt:'2026-04-10T12:00:00Z',
-    workflowId:'case-c-002'
+    workflowId:'case-c-002',
+    lat: 38.8338, lon: -76.8692, location:'I-95 Corridor, MD/VA'
   },
   {
     id: 'c-003', caseNumber:'305-WF-00877', classificationCode:'305', originatingOffice:'WF', serialNumber: 877,
@@ -277,7 +435,8 @@ const SEED_CASES = [
     assignedAgentId:'supervisor.jones',
     createdAt:'2026-04-18T08:30:00Z', createdBy:'supervisor.jones',
     updatedAt:'2026-04-19T16:12:00Z',
-    workflowId:'case-c-003'
+    workflowId:'case-c-003',
+    lat: 38.9072, lon: -77.0369, location:'Washington, DC'
   },
   {
     id: 'c-004', caseNumber:'196-HQ-09931', classificationCode:'196', originatingOffice:'HQ', serialNumber: 9931,
@@ -287,7 +446,8 @@ const SEED_CASES = [
     assignedAgentId:'agent.smith', supervisorId:'supervisor.jones',
     createdAt:'2023-06-14T09:00:00Z', createdBy:'agent.smith',
     openedAt:'2023-07-01T10:00:00Z', updatedAt:'2026-04-17T13:00:00Z',
-    workflowId:'case-c-004'
+    workflowId:'case-c-004',
+    lat: 33.7490, lon: -84.3880, location:'Atlanta, GA'
   },
   {
     id: 'c-005', caseNumber:'089-LA-22140', classificationCode:'089', originatingOffice:'LA', serialNumber: 22140,
@@ -297,7 +457,8 @@ const SEED_CASES = [
     assignedAgentId:'agent.smith', supervisorId:'supervisor.jones',
     createdAt:'2025-09-02T09:00:00Z', createdBy:'agent.smith',
     openedAt:'2025-09-10T14:00:00Z', updatedAt:'2026-03-21T11:00:00Z',
-    workflowId:'case-c-005'
+    workflowId:'case-c-005',
+    lat: 34.0522, lon: -118.2437, location:'Los Angeles, CA'
   },
   {
     id: 'c-006', caseNumber:'245-CH-03302', classificationCode:'245', originatingOffice:'CH', serialNumber: 3302,
@@ -307,7 +468,8 @@ const SEED_CASES = [
     assignedAgentId:'supervisor.jones', supervisorId:'supervisor.jones',
     createdAt:'2026-02-14T07:45:00Z', createdBy:'supervisor.jones',
     openedAt:'2026-02-16T10:00:00Z', updatedAt:'2026-04-12T09:33:00Z',
-    workflowId:'case-c-006'
+    workflowId:'case-c-006',
+    lat: 41.8781, lon: -87.6298, location:'Chicago, IL'
   },
   {
     id: 'c-007', caseNumber:'091-NY-55012', classificationCode:'091', originatingOffice:'NY', serialNumber: 55012,
@@ -319,7 +481,8 @@ const SEED_CASES = [
     openedAt:'2024-04-01T14:00:00Z', closedAt:'2024-11-08T16:00:00Z',
     updatedAt:'2024-11-08T16:00:00Z',
     closureReason:'Subject indicted, plead guilty. Final report filed.',
-    workflowId:'case-c-007'
+    workflowId:'case-c-007',
+    lat: 40.7549, lon: -73.9840, location:'W 42nd & 6th Ave, NY'
   },
   {
     id: 'c-008', caseNumber:'281-HQ-00127', classificationCode:'281', originatingOffice:'HQ', serialNumber: 127,
@@ -329,7 +492,8 @@ const SEED_CASES = [
     assignedAgentId:'sa.admin',
     createdAt:'2026-04-19T11:00:00Z', createdBy:'sa.admin',
     updatedAt:'2026-04-19T11:00:00Z',
-    workflowId:'case-c-008'
+    workflowId:'case-c-008',
+    lat: 38.8951, lon: -77.0364, location:'Washington, DC'
   }
 ];
 
@@ -440,8 +604,8 @@ const SEED_AUDIT = [
 <!-- ============================================================== -->
 <script>
 const LS = {
-  USERS:'Demo Only.users', CASES:'Demo Only.cases', DOCS:'Demo Only.docs',
-  AUDIT:'Demo Only.audit', SESSION:'Demo Only.session'
+  USERS:'sentinel.users', CASES:'sentinel.cases', DOCS:'sentinel.docs',
+  AUDIT:'sentinel.audit', SESSION:'sentinel.session'
 };
 
 function loadOrSeed(key, seed) {
@@ -496,6 +660,46 @@ const Store = {
 
   hasAnyRole(...roles) { return roles.some(r => this.hasRole(r)); }
 };
+
+// ── UI preferences (theme + font scale + mobile nav) ──────────────
+const Prefs = {
+  theme: localStorage.getItem('sentinel.theme') || 'light',
+  fontScale: parseFloat(localStorage.getItem('sentinel.fontScale') || '1'),
+  mobileNavOpen: false,
+
+  apply() {
+    document.documentElement.classList.toggle('dark', this.theme === 'dark');
+    document.documentElement.style.setProperty('--font-scale', this.fontScale);
+  },
+  setTheme(t) {
+    this.theme = t;
+    localStorage.setItem('sentinel.theme', t);
+    this.apply();
+    render();
+    // resize map if present
+    if (window.__mapInstance) setTimeout(() => window.__mapInstance.updateSize(), 50);
+  },
+  toggleTheme() { this.setTheme(this.theme === 'dark' ? 'light' : 'dark'); },
+  setFontScale(s) {
+    this.fontScale = Math.max(0.8, Math.min(1.4, Math.round(s * 100) / 100));
+    localStorage.setItem('sentinel.fontScale', String(this.fontScale));
+    this.apply();
+    render();
+  },
+  bumpFont(delta) { this.setFontScale(this.fontScale + delta); },
+  resetFont()    { this.setFontScale(1); },
+  toggleMobileNav() {
+    this.mobileNavOpen = !this.mobileNavOpen;
+    document.querySelector('.sidebar')?.classList.toggle('open', this.mobileNavOpen);
+    document.querySelector('.mobile-overlay')?.classList.toggle('open', this.mobileNavOpen);
+  },
+  closeMobileNav() {
+    this.mobileNavOpen = false;
+    document.querySelector('.sidebar')?.classList.remove('open');
+    document.querySelector('.mobile-overlay')?.classList.remove('open');
+  }
+};
+Prefs.apply();
 
 // ── helpers ────────────────────────────────────────────────────────
 function uuid() {
@@ -603,7 +807,7 @@ function viewLogin() {
     <div class="login-bg min-h-screen flex items-center justify-center p-6">
       <div class="w-full max-w-md">
         <div class="text-center mb-8">
-          <div class="seal-ring mb-5"><div class="seal-inner">Demo Only</div></div>
+          <div class="seal-ring mb-5"><div class="seal-inner">SENTINEL</div></div>
           <h1 class="font-display text-3xl font-semibold text-paper tracking-wide">Case Management System</h1>
           <div class="mt-2 font-mono text-xs text-paper/50 tracking-[0.2em]">UNCLASSIFIED // REFERENCE</div>
         </div>
@@ -659,6 +863,7 @@ function shell(inner, pageLabel) {
   const navItems = [
     { id:'dashboard',  label:'Dashboard', icon: iconDashboard() },
     { id:'cases',      label:'Cases',     icon: iconFolder()    },
+    { id:'map',        label:'Map',       icon: iconMap()       },
     { id:'search',     label:'Search',    icon: iconSearch()    },
     { id:'workflows',  label:'Workflows', icon: iconWorkflow()  },
     ...(Store.hasAnyRole('AUDITOR','SYSTEM_ADMIN')
@@ -668,21 +873,26 @@ function shell(inner, pageLabel) {
 
   return `
   <div class="flex min-h-screen">
+    <div class="mobile-overlay ${Prefs.mobileNavOpen ? 'open' : ''}" onclick="Prefs.closeMobileNav()"></div>
+
     <!-- sidebar -->
-    <aside class="w-60 bg-ink-900 text-paper flex-shrink-0 flex flex-col">
-      <div class="px-5 pt-6 pb-5 border-b border-white/5">
-        <div class="font-mono font-bold text-sm tracking-[0.4em] text-[#c7a35a]">Demo Only</div>
-        <div class="text-[10.5px] font-mono tracking-[0.15em] text-paper/50 mt-1">CASE MGMT SYSTEM</div>
+    <aside class="sidebar ${Prefs.mobileNavOpen ? 'open' : ''}">
+      <div class="px-5 pt-6 pb-5 border-b border-white/5 flex items-center justify-between">
+        <div>
+          <div class="font-mono font-bold text-sm tracking-[0.4em]" style="color: var(--accent)">SENTINEL</div>
+          <div class="text-[10.5px] font-mono tracking-[0.15em] mt-1" style="color: var(--sidebar-muted)">CASE MGMT SYSTEM</div>
+        </div>
+        <button class="hamburger p-1" onclick="Prefs.closeMobileNav()" style="color: var(--sidebar-fg)">${iconX()}</button>
       </div>
       <nav class="py-3 flex-1">
         ${navItems.map(n => `
-          <a href="#${n.id}" class="nav-link ${Router.route === n.id ? 'active' : ''}">
+          <a href="#${n.id}" onclick="Prefs.closeMobileNav()" class="nav-link ${Router.route === n.id ? 'active' : ''}">
             <span class="opacity-80">${n.icon}</span>
             <span>${n.label}</span>
           </a>
         `).join('')}
       </nav>
-      <div class="px-5 py-4 border-t border-white/5 text-[10.5px] font-mono tracking-wider text-paper/40">
+      <div class="px-5 py-4 border-t border-white/5 text-[10.5px] font-mono tracking-wider" style="color: var(--sidebar-muted); opacity: 0.7">
         <div>v1.0.0-demo</div>
         <div class="mt-1">© Reference Impl.</div>
       </div>
@@ -694,46 +904,62 @@ function shell(inner, pageLabel) {
       <div class="classbanner">UNCLASSIFIED // FOR DEMONSTRATION ONLY</div>
 
       <!-- topbar -->
-      <header class="bg-paper border-b border-ink-200 px-8 py-3 flex items-center gap-4">
-        <div class="flex-1">
-          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">${esc(pageLabel || '')}</div>
+      <header class="border-b px-4 md:px-8 py-3 flex items-center gap-2 md:gap-4" style="background: var(--bg); border-color: var(--border-strong);">
+        <button class="hamburger p-2 rounded hover:bg-black/5" onclick="Prefs.toggleMobileNav()" aria-label="Menu">${iconMenu()}</button>
+
+        <div class="flex-1 topbar-title">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase" style="color: var(--text-muted)">${esc(pageLabel || '')}</div>
         </div>
-        <div class="flex items-center gap-3">
-          <button onclick="openCommandPalette()" class="font-mono text-[11px] tracking-wider text-ink-700/70 hover:text-ink-900 border border-ink-200 rounded px-3 py-1.5 flex items-center gap-2">
-            ${iconSearchSm()} <span>Jump to case…</span>
-            <span class="font-mono text-[10px] bg-ink-100 px-1.5 py-0.5 rounded ml-2">⌘ K</span>
+
+        <!-- font-size controls -->
+        <div class="flex items-center gap-1" title="Font size">
+          <button class="theme-btn" onclick="Prefs.bumpFont(-0.05)" aria-label="Decrease font size">A−</button>
+          <button class="theme-btn" onclick="Prefs.resetFont()" aria-label="Reset font size" title="Reset">
+            <span class="num">${Math.round(Prefs.fontScale * 100)}%</span>
           </button>
-          <div class="relative">
-            <button id="user-menu-btn" onclick="toggleUserMenu()" class="flex items-center gap-2.5 px-3 py-1.5 hover:bg-ink-100 rounded">
-              <div class="w-8 h-8 rounded-full bg-ink-800 text-paper flex items-center justify-center font-mono text-[11px] font-bold">
-                ${esc(u.name.split(' ').map(x => x[0]).join('').slice(0,2))}
-              </div>
-              <div class="text-left">
-                <div class="text-[13px] font-medium leading-tight">${esc(u.name)}</div>
-                <div class="font-mono text-[10.5px] text-ink-700/70 leading-tight">${esc(u.badge)}</div>
-              </div>
-            </button>
-            <div id="user-menu" class="hidden absolute right-0 top-full mt-1 w-64 bg-paper border border-ink-200 rounded shadow-card z-20">
-              <div class="px-4 py-3 border-b border-ink-200">
-                <div class="font-medium text-sm">${esc(u.name)}</div>
-                <div class="font-mono text-[11px] text-ink-700/70">${esc(u.email)}</div>
-                <div class="mt-2 flex flex-wrap gap-1">
-                  ${u.roles.map(r => `<span class="font-mono text-[9px] bg-ink-100 px-1.5 py-0.5 rounded tracking-wider">${esc(r.replace('ROLE_',''))}</span>`).join('')}
-                </div>
-              </div>
-              <button onclick="doLogout()" class="w-full text-left px-4 py-2.5 text-sm hover:bg-ink-100 flex items-center gap-2">
-                ${iconLogout()} Sign out
-              </button>
-              <button onclick="if(confirm('Reset all demo data?')) Store.reset()" class="w-full text-left px-4 py-2.5 text-sm hover:bg-ink-100 flex items-center gap-2 text-stamp-red">
-                ${iconReset()} Reset demo data
-              </button>
+          <button class="theme-btn" onclick="Prefs.bumpFont(0.05)" aria-label="Increase font size">A+</button>
+        </div>
+
+        <!-- theme toggle -->
+        <button class="theme-btn" onclick="Prefs.toggleTheme()" aria-label="Toggle dark mode" title="Toggle theme">
+          ${Prefs.theme === 'dark' ? iconSun() : iconMoon()}
+        </button>
+
+        <button onclick="openCommandPalette()" class="hide-sm font-mono text-[11px] tracking-wider border rounded px-3 py-1.5 flex items-center gap-2" style="border-color: var(--border-strong); color: var(--text-muted);">
+          ${iconSearchSm()} <span>Jump to case…</span>
+          <span class="kbd-hint font-mono text-[10px] px-1.5 py-0.5 rounded ml-2" style="background: var(--ink-100)">⌘ K</span>
+        </button>
+
+        <div class="relative">
+          <button id="user-menu-btn" onclick="toggleUserMenu()" class="flex items-center gap-2 px-2 md:px-3 py-1.5 rounded" style="transition: background 0.1s" onmouseover="this.style.background='var(--bg-alt)'" onmouseout="this.style.background=''">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center font-mono text-[11px] font-bold flex-shrink-0" style="background: var(--text); color: var(--bg);">
+              ${esc(u.name.split(' ').map(x => x[0]).join('').slice(0,2))}
             </div>
+            <div class="text-left hide-sm">
+              <div class="text-[13px] font-medium leading-tight">${esc(u.name)}</div>
+              <div class="font-mono text-[10.5px] leading-tight" style="color: var(--text-muted)">${esc(u.badge)}</div>
+            </div>
+          </button>
+          <div id="user-menu" class="hidden absolute right-0 top-full mt-1 w-64 border rounded shadow-lg z-20" style="background: var(--surface); border-color: var(--border-strong);">
+            <div class="px-4 py-3 border-b" style="border-color: var(--border);">
+              <div class="font-medium text-sm">${esc(u.name)}</div>
+              <div class="font-mono text-[11px]" style="color: var(--text-muted)">${esc(u.email)}</div>
+              <div class="mt-2 flex flex-wrap gap-1">
+                ${u.roles.map(r => `<span class="font-mono text-[9px] px-1.5 py-0.5 rounded tracking-wider" style="background: var(--ink-100)">${esc(r.replace('ROLE_',''))}</span>`).join('')}
+              </div>
+            </div>
+            <button onclick="doLogout()" class="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 hover:opacity-80" style="background: transparent;" onmouseover="this.style.background='var(--bg-alt)'" onmouseout="this.style.background='transparent'">
+              ${iconLogout()} Sign out
+            </button>
+            <button onclick="if(confirm('Reset all demo data?')) Store.reset()" class="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2" style="color: #a5332a;" onmouseover="this.style.background='var(--bg-alt)'" onmouseout="this.style.background='transparent'">
+              ${iconReset()} Reset demo data
+            </button>
           </div>
         </div>
       </header>
 
       <!-- content -->
-      <div class="flex-1 px-8 py-8 max-w-[1500px] w-full mx-auto fade-up">${inner}</div>
+      <div class="flex-1 px-4 md:px-8 py-6 md:py-8 max-w-[1500px] w-full mx-auto fade-up content-pad">${inner}</div>
     </main>
   </div>
   `;
@@ -770,14 +996,14 @@ function viewDashboard() {
 
   return shell(`
     <div class="mb-8">
-      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Dossier Dashboard</div>
-      <h1 class="font-display text-4xl font-semibold mt-1 text-ink-900 tracking-tight">Good day, ${esc(u.name.split(' ')[0])}.</h1>
-      <div class="text-ink-700/70 text-sm mt-1.5">Signed in as <span class="font-mono">${esc(u.username)}</span> · ${u.roles.length} role${u.roles.length!==1?'s':''} active</div>
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">Dossier Dashboard</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 tracking-tight page-h1">Good day, ${esc(u.name.split(' ')[0])}.</h1>
+      <div class="text-[color:var(--text-muted)] text-sm mt-1.5">Signed in as <span class="font-mono">${esc(u.username)}</span> · ${u.roles.length} role${u.roles.length!==1?'s':''} active</div>
     </div>
 
     <!-- stat row -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      ${statTile('TOTAL CASES', total, 'All statuses', 'border-ink-800', '#1c1b17')}
+      ${statTile('TOTAL CASES', total, 'All statuses', 'border-[var(--text)]', '#1c1b17')}
       ${statTile('OPEN', open, 'Actively investigated', 'border-stamp-green', '#2f6f3a')}
       ${statTile('PENDING APPROVAL', pending, 'Awaiting supervisor', 'border-stamp-amber', '#a16207')}
       ${statTile('CLOSED / ARCHIVED', closed, 'Historical record', 'border-stamp-blue', '#1a3a6b')}
@@ -789,7 +1015,7 @@ function viewDashboard() {
       <div class="card p-6 lg:col-span-2">
         <div class="flex items-center justify-between mb-5">
           <div>
-            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 01</div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">§ 01</div>
             <h2 class="font-display text-xl font-semibold mt-0.5">Case distribution by status</h2>
           </div>
           <a href="#cases" class="btn btn-ghost btn-sm">View all →</a>
@@ -801,8 +1027,8 @@ function viewDashboard() {
             return `
               <div class="flex items-center gap-3">
                 <div class="w-44 flex-shrink-0"><span class="badge status-${s}">${s.replace(/_/g,' ')}</span></div>
-                <div class="flex-1 h-5 bg-ink-100 rounded-sm overflow-hidden">
-                  <div class="h-full bg-ink-800 transition-all" style="width:${pct}%"></div>
+                <div class="flex-1 h-5 bg-[var(--ink-100)] rounded-sm overflow-hidden">
+                  <div class="h-full bg-[var(--text)] transition-all" style="width:${pct}%"></div>
                 </div>
                 <div class="w-12 text-right font-mono text-sm num">${n}</div>
               </div>
@@ -815,20 +1041,20 @@ function viewDashboard() {
       <div class="card p-6">
         <div class="flex items-center justify-between mb-5">
           <div>
-            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 02</div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">§ 02</div>
             <h2 class="font-display text-xl font-semibold mt-0.5">Approval queue</h2>
           </div>
           <span class="badge status-PENDING_APPROVAL">${needsApproval.length}</span>
         </div>
         ${needsApproval.length === 0 ? `
-          <div class="text-sm text-ink-700/60 py-6 text-center">No pending approvals.</div>
+          <div class="text-sm text-[color:var(--text-muted)] py-6 text-center">No pending approvals.</div>
         ` : `
           <div class="space-y-2">
             ${needsApproval.slice(0,5).map(c => `
-              <a href="#case?id=${c.id}" class="block p-3 rounded border border-ink-200 hover:border-ink-800 hover:bg-ink-50 transition">
+              <a href="#case?id=${c.id}" class="block p-3 rounded border border-[var(--border)] hover:border-[var(--text)] hover:bg-[var(--bg-alt)] transition">
                 <div class="flex items-baseline gap-2">
                   <span class="casenum text-sm">${esc(c.caseNumber)}</span>
-                  <span class="text-[11px] text-ink-700/60">${timeAgo(c.updatedAt)}</span>
+                  <span class="text-[11px] text-[color:var(--text-muted)]">${timeAgo(c.updatedAt)}</span>
                 </div>
                 <div class="text-sm mt-1 truncate">${esc(c.title)}</div>
               </a>
@@ -841,17 +1067,17 @@ function viewDashboard() {
       <div class="card p-6 lg:col-span-2">
         <div class="flex items-center justify-between mb-5">
           <div>
-            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 03</div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">§ 03</div>
             <h2 class="font-display text-xl font-semibold mt-0.5">Assigned to you</h2>
           </div>
-          <span class="font-mono text-sm text-ink-700/70 num">${myCases.length} case${myCases.length!==1?'s':''}</span>
+          <span class="font-mono text-sm text-[color:var(--text-muted)] num">${myCases.length} case${myCases.length!==1?'s':''}</span>
         </div>
         ${myCases.length === 0 ? `
-          <div class="text-sm text-ink-700/60 py-6 text-center">You have no cases currently assigned.</div>
+          <div class="text-sm text-[color:var(--text-muted)] py-6 text-center">You have no cases currently assigned.</div>
         ` : `
           <div class="space-y-1.5">
             ${myCases.slice(0,6).map(c => `
-              <a href="#case?id=${c.id}" class="flex items-center gap-3 p-2.5 rounded hover:bg-ink-50 transition">
+              <a href="#case?id=${c.id}" class="flex items-center gap-3 p-2.5 rounded hover:bg-[var(--bg-alt)] transition">
                 <span class="casenum text-sm w-36 flex-shrink-0">${esc(c.caseNumber)}</span>
                 <span class="text-sm flex-1 truncate">${esc(c.title)}</span>
                 <span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span>
@@ -865,7 +1091,7 @@ function viewDashboard() {
       <div class="card p-6">
         <div class="flex items-center justify-between mb-5">
           <div>
-            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 04</div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">§ 04</div>
             <h2 class="font-display text-xl font-semibold mt-0.5">Recent activity</h2>
           </div>
           ${Store.hasAnyRole('AUDITOR','SYSTEM_ADMIN') ? `<a href="#audit" class="btn btn-ghost btn-sm">Audit →</a>` : ''}
@@ -873,13 +1099,13 @@ function viewDashboard() {
         <div class="space-y-3">
           ${recentActivity.map(a => `
             <div class="flex gap-3 text-sm">
-              <div class="w-1.5 flex-shrink-0 rounded-full bg-ink-800 mt-1.5 self-stretch"></div>
+              <div class="w-1.5 flex-shrink-0 rounded-full mt-1.5 self-stretch" style="background:var(--text)"></div>
               <div class="flex-1 min-w-0">
-                <div class="font-mono text-[11px] tracking-wider text-ink-700/70">${esc(a.action)}</div>
+                <div class="font-mono text-[11px] tracking-wider text-[color:var(--text-muted)]">${esc(a.action)}</div>
                 <div class="truncate text-[13px] mt-0.5">
                   ${esc(a.actorUsername)} ${a.caseNumber ? `on <span class="casenum">${esc(a.caseNumber)}</span>` : ''}
                 </div>
-                <div class="text-[11px] text-ink-700/60 mt-0.5">${timeAgo(a.occurredAt)}</div>
+                <div class="text-[11px] text-[color:var(--text-muted)] mt-0.5">${timeAgo(a.occurredAt)}</div>
               </div>
             </div>
           `).join('')}
@@ -891,14 +1117,14 @@ function viewDashboard() {
     <div class="mt-8 card p-6">
       <div class="flex items-center justify-between mb-5">
         <div>
-          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 05</div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">§ 05</div>
           <h2 class="font-display text-xl font-semibold mt-0.5">System integration status</h2>
         </div>
         <span class="font-mono text-[10.5px] tracking-wider text-stamp-green">● ALL OPERATIONAL</span>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         ${[
-          {k:'Keycloak OIDC', v:'Online', note:'Demo Only realm'},
+          {k:'Keycloak OIDC', v:'Online', note:'sentinel realm'},
           {k:'PostgreSQL',    v:'Online', note:'case store · audit'},
           {k:'Elasticsearch', v:'Online', note:`${Store.docs.length} indexed`},
           {k:'Temporal',      v:'Online', note:'workflows active'},
@@ -907,12 +1133,12 @@ function viewDashboard() {
           {k:'Tesseract OCR', v:'Online', note:'eng model'},
           {k:'LibreOffice',   v:'Online', note:'headless convert'}
         ].map(s => `
-          <div class="border border-ink-200 rounded p-3 bg-ink-50/50">
+          <div class="border border-[var(--border)] rounded p-3 bg-[var(--bg-alt)]">
             <div class="flex items-center justify-between">
               <span class="text-[13px] font-medium">${esc(s.k)}</span>
               <span class="w-1.5 h-1.5 rounded-full bg-stamp-green"></span>
             </div>
-            <div class="font-mono text-[10.5px] text-ink-700/60 mt-0.5">${esc(s.note)}</div>
+            <div class="font-mono text-[10.5px] text-[color:var(--text-muted)] mt-0.5">${esc(s.note)}</div>
           </div>
         `).join('')}
       </div>
@@ -922,10 +1148,10 @@ function viewDashboard() {
 
 function statTile(label, value, note, borderClass, accentHex) {
   return `
-    <div class="card p-5 border-t-2 ${borderClass}">
-      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">${label}</div>
+    <div class="card p-5 stat-tile-sm border-t-2 ${borderClass}">
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase" style="color: var(--text-muted)">${label}</div>
       <div class="font-display text-4xl font-semibold mt-2 num" style="color:${accentHex}">${value}</div>
-      <div class="text-[11px] text-ink-700/60 mt-1">${note}</div>
+      <div class="text-[11px] mt-1" style="color: var(--text-muted)">${note}</div>
     </div>
   `;
 }
@@ -950,9 +1176,9 @@ function viewCases() {
   return shell(`
     <div class="flex items-end gap-4 mb-6">
       <div class="flex-1">
-        <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Case Registry</div>
-        <h1 class="font-display text-4xl font-semibold mt-1">Cases</h1>
-        <div class="text-ink-700/70 text-sm mt-1.5">Browse and manage all case files.</div>
+        <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">Case Registry</div>
+        <h1 class="font-display text-4xl font-semibold mt-1 page-h1">Cases</h1>
+        <div class="text-[color:var(--text-muted)] text-sm mt-1.5">Browse and manage all case files.</div>
       </div>
       ${Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN') ? `
         <a href="#new-case" class="btn btn-pri">${iconPlus()} Open new case</a>
@@ -987,7 +1213,7 @@ function viewCases() {
         ${(caseListFilter.q || caseListFilter.status || caseListFilter.office) ? `
           <button class="btn btn-ghost btn-sm" onclick="caseListFilter={status:'',office:'',q:''}; render()">Clear</button>
         ` : ''}
-        <div class="ml-auto font-mono text-[11px] tracking-wider text-ink-700/60 num">
+        <div class="ml-auto font-mono text-[11px] tracking-wider text-[color:var(--text-muted)] num">
           ${filtered.length} / ${Store.cases.length}
         </div>
       </div>
@@ -995,40 +1221,42 @@ function viewCases() {
 
     <!-- table -->
     <div class="card overflow-hidden">
-      <table class="dossier">
-        <thead>
-          <tr>
-            <th>Case №</th>
-            <th>Title</th>
-            <th>Classification</th>
-            <th>Office</th>
-            <th>Status</th>
-            <th class="text-right">Docs</th>
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filtered.length === 0 ? `
-            <tr><td colspan="7" class="text-center py-12 text-ink-700/60">No cases match the current filters.</td></tr>
-          ` : filtered.map(c => {
-              const docs = getCaseDocs(c.id);
-              return `
-                <tr onclick="Router.go('case', {id:'${c.id}'})">
-                  <td><span class="casenum text-[13px]">${esc(c.caseNumber)}</span></td>
-                  <td class="font-medium">${esc(c.title)}</td>
-                  <td>
-                    <div class="font-mono text-[12px]">${esc(c.classificationCode)}</div>
-                    <div class="text-[11px] text-ink-700/60">${esc(classLabel(c.classificationCode))}</div>
-                  </td>
-                  <td><span class="font-mono text-[12px]">${esc(c.originatingOffice)}</span></td>
-                  <td><span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span></td>
-                  <td class="text-right font-mono num">${docs.length}</td>
-                  <td class="text-[12px]">${dateFmt(c.updatedAt || c.createdAt)}<div class="text-[10.5px] text-ink-700/60">${timeAgo(c.updatedAt || c.createdAt)}</div></td>
-                </tr>
-              `;
-            }).join('')}
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="dossier">
+          <thead>
+            <tr>
+              <th>Case №</th>
+              <th>Title</th>
+              <th>Classification</th>
+              <th>Office</th>
+              <th>Status</th>
+              <th class="text-right">Docs</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.length === 0 ? `
+              <tr><td colspan="7" class="text-center py-12" style="color: var(--text-muted)">No cases match the current filters.</td></tr>
+            ` : filtered.map(c => {
+                const docs = getCaseDocs(c.id);
+                return `
+                  <tr onclick="Router.go('case', {id:'${c.id}'})">
+                    <td><span class="casenum text-[13px]">${esc(c.caseNumber)}</span></td>
+                    <td class="font-medium">${esc(c.title)}</td>
+                    <td>
+                      <div class="font-mono text-[12px]">${esc(c.classificationCode)}</div>
+                      <div class="text-[11px]" style="color: var(--text-muted)">${esc(classLabel(c.classificationCode))}</div>
+                    </td>
+                    <td><span class="font-mono text-[12px]">${esc(c.originatingOffice)}</span></td>
+                    <td><span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span></td>
+                    <td class="text-right font-mono num">${docs.length}</td>
+                    <td class="text-[12px]">${dateFmt(c.updatedAt || c.createdAt)}<div class="text-[10.5px]" style="color: var(--text-muted)">${timeAgo(c.updatedAt || c.createdAt)}</div></td>
+                  </tr>
+                `;
+              }).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `, 'Cases');
 }
@@ -1045,11 +1273,11 @@ function viewNewCase() {
   return shell(`
     <div class="max-w-3xl">
       <div class="flex items-center gap-2 mb-4 text-sm">
-        <a href="#cases" class="text-ink-700/70 hover:text-ink-900">← Cases</a>
+        <a href="#cases" class="text-[color:var(--text-muted)] hover:text-[color:var(--text)]">← Cases</a>
       </div>
-      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">New Dossier</div>
-      <h1 class="font-display text-4xl font-semibold mt-1 mb-1">Open a new case</h1>
-      <div class="text-ink-700/70 text-sm mb-7">
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">New Dossier</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 mb-1 page-h1">Open a new case</h1>
+      <div class="text-[color:var(--text-muted)] text-sm mb-7">
         A draft is created and assigned to you. Submit for supervisor approval to transition to OPEN.
       </div>
 
@@ -1071,9 +1299,9 @@ function viewNewCase() {
           </div>
         </div>
 
-        <div class="bg-ink-50/70 border border-ink-200 rounded p-4 flex items-center gap-4">
+        <div class="bg-[var(--bg-alt)] border border-[var(--border)] rounded p-4 flex items-center gap-4">
           <div class="flex-1">
-            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">Allocated case number</div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">Allocated case number</div>
             <div class="casenum text-2xl mt-1" id="case-number-preview">———-——-——————</div>
           </div>
           <div class="stamp stamp-grey no-rotate">PREVIEW</div>
@@ -1097,7 +1325,26 @@ function viewNewCase() {
                  placeholder="cyber, financial, multi-state">
         </div>
 
-        <div class="flex items-center gap-3 pt-3 border-t border-ink-200">
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="lbl">Latitude (optional)</label>
+            <input name="lat" type="number" step="0.0001" class="field" placeholder="40.7580">
+          </div>
+          <div>
+            <label class="lbl">Longitude (optional)</label>
+            <input name="lon" type="number" step="0.0001" class="field" placeholder="-73.9855">
+          </div>
+          <div>
+            <label class="lbl">Location label</label>
+            <input name="location" type="text" class="field" placeholder="Midtown Manhattan">
+          </div>
+        </div>
+        <div class="text-[11.5px] flex items-center gap-2" style="color: var(--text-muted)">
+          ${iconPin()}
+          <span>Tip: you can also open cases by clicking directly on the <a href="#map" class="underline">map</a>.</span>
+        </div>
+
+        <div class="flex items-center gap-3 pt-3 border-t border-[var(--border)]">
           <a href="#cases" class="btn btn-ghost">Cancel</a>
           <div class="flex-1"></div>
           <button type="submit" class="btn btn-pri">${iconPlus()} Create draft case</button>
@@ -1128,6 +1375,9 @@ function submitNewCase(event) {
   const office = f.office.value;
   const serial = nextSerial(classCode, office);
   const tags = f.tags.value.split(',').map(t => t.trim()).filter(Boolean);
+  const lat = parseFloat(f.lat.value) || null;
+  const lon = parseFloat(f.lon.value) || null;
+  const location = f.location.value.trim() || null;
 
   const newCase = {
     id: uuid(),
@@ -1139,6 +1389,8 @@ function submitNewCase(event) {
     synopsis: f.synopsis.value.trim() || undefined,
     status: 'DRAFT',
     tags,
+    ...(lat && lon ? { lat, lon } : {}),
+    ...(location ? { location } : {}),
     assignedAgentId: Store.currentUser().username,
     createdAt: new Date().toISOString(),
     createdBy: Store.currentUser().username,
@@ -1155,7 +1407,7 @@ function submitNewCase(event) {
 // ── Case detail ────────────────────────────────────────────────────
 function viewCase() {
   const c = Store.cases.find(x => x.id === Router.params.id);
-  if (!c) return shell(`<div class="py-12 text-center text-ink-700/60">Case not found.</div>`, 'Not found');
+  if (!c) return shell(`<div class="py-12 text-center text-[color:var(--text-muted)]">Case not found.</div>`, 'Not found');
 
   const docs = getCaseDocs(c.id);
   const canEdit = !['CLOSED','ARCHIVED'].includes(c.status) && Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN');
@@ -1200,7 +1452,7 @@ function viewCase() {
 
   return shell(`
     <div class="flex items-center gap-2 mb-4 text-sm">
-      <a href="#cases" class="text-ink-700/70 hover:text-ink-900">← Cases</a>
+      <a href="#cases" class="text-[color:var(--text-muted)] hover:text-[color:var(--text)]">← Cases</a>
     </div>
 
     <!-- header -->
@@ -1209,16 +1461,16 @@ function viewCase() {
       <div class="p-7">
         <div class="flex items-start gap-6">
           <div class="flex-1 min-w-0">
-            <div class="font-mono text-[10.5px] tracking-[0.2em] uppercase text-ink-700/60">Case File</div>
+            <div class="font-mono text-[10.5px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">Case File</div>
             <div class="casenum text-3xl mt-1">${esc(c.caseNumber)}</div>
             <h1 class="font-display text-2xl font-semibold mt-3 leading-snug">${esc(c.title)}</h1>
             <div class="flex flex-wrap gap-1.5 mt-3">
-              ${(c.tags || []).map(t => `<span class="font-mono text-[11px] bg-ink-100 border border-ink-200 px-2 py-0.5 rounded-sm">${esc(t)}</span>`).join('')}
+              ${(c.tags || []).map(t => `<span class="font-mono text-[11px] bg-[var(--ink-100)] border border-[var(--border)] px-2 py-0.5 rounded-sm">${esc(t)}</span>`).join('')}
             </div>
           </div>
           <div class="flex flex-col items-end gap-3 flex-shrink-0">
             <span class="stamp ${statusStampClass(c.status)} stamp-in">${c.status.replace(/_/g,' ')}</span>
-            <div class="font-mono text-[10.5px] text-ink-700/60 text-right">
+            <div class="font-mono text-[10.5px] text-[color:var(--text-muted)] text-right">
               Serial #${String(c.serialNumber).padStart(5,'0')}<br>
               ${classLabel(c.classificationCode)}<br>
               ${OFFICES.find(o => o.code === c.originatingOffice)?.label}
@@ -1227,24 +1479,37 @@ function viewCase() {
         </div>
 
         ${c.synopsis ? `
-          <div class="mt-5 pt-5 border-t border-ink-200">
+          <div class="mt-5 pt-5 border-t border-[var(--border)]">
             <div class="lbl mb-2">Synopsis</div>
             <p class="text-[14px] leading-relaxed">${esc(c.synopsis)}</p>
           </div>
         ` : ''}
 
-        <div class="mt-5 pt-5 border-t border-ink-200 grid grid-cols-2 md:grid-cols-4 gap-5">
+        <div class="mt-5 pt-5 border-t border-[var(--border)] grid grid-cols-2 md:grid-cols-4 gap-5 meta-grid-m">
           ${metaItem('Opened',   dateFmt(c.openedAt))}
           ${metaItem('Closed',   dateFmt(c.closedAt))}
           ${metaItem('Created',  dateFmt(c.createdAt))}
           ${metaItem('Assigned', assignedUser ? `${assignedUser.name} (${assignedUser.badge})` : (c.assignedAgentId || '—'))}
         </div>
+
+        ${c.lat && c.lon ? `
+          <div class="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-3 flex-wrap">
+            <div class="flex-1 flex items-center gap-2">
+              ${iconPin()}
+              <div>
+                <div class="text-[13px]">${esc(c.location || '')}</div>
+                <div class="font-mono text-[11px]" style="color: var(--text-muted)">${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</div>
+              </div>
+            </div>
+            <a href="#map" onclick="setTimeout(()=>flyToCase('${c.id}'),400)" class="btn btn-out btn-sm">View on map →</a>
+          </div>
+        ` : ''}
       </div>
     </div>
 
     <!-- workflow ladder + actions -->
     <div class="card p-6 mb-6">
-      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-3">Workflow state</div>
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)] mb-3">Workflow state</div>
       <div class="flex items-center gap-2 mb-6 overflow-x-auto">
         ${timeline.map((t, i) => {
           const done   = statusOrder[t.status] < currentOrder;
@@ -1252,15 +1517,15 @@ function viewCase() {
           const isSuspended = c.status === 'SUSPENDED' && t.status === 'OPEN';
           return `
             <div class="flex items-center gap-2 flex-shrink-0 ${i > 0 ? 'ml-1' : ''}">
-              ${i > 0 ? `<div class="w-10 h-[2px] ${done || active ? 'bg-ink-800' : 'bg-ink-200'}"></div>` : ''}
+              ${i > 0 ? `<div class="w-10 h-[2px] ${done || active ? 'bg-[var(--text)]' : 'bg-[var(--ink-200)]'}"></div>` : ''}
               <div class="flex flex-col items-center">
                 <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold
-                            ${active ? 'bg-ink-800 text-paper pulse' :
-                              done ? 'bg-ink-800 text-paper' :
-                              isSuspended ? 'bg-stamp-red text-paper' : 'bg-ink-100 text-ink-700/50 border border-ink-200'}">
+                            ${active ? 'pulse" style="background:var(--text);color:var(--bg)' :
+                              done ? '" style="background:var(--text);color:var(--bg)' :
+                              isSuspended ? '" style="background:#a5332a;color:#f5f3ea' : '" style="background:var(--ink-100);color:var(--text-faint);border-color:var(--border-strong)'}">
                   ${done ? '✓' : i + 1}
                 </div>
-                <div class="font-mono text-[9.5px] tracking-wider mt-1.5 ${active || done ? 'text-ink-900 font-semibold' : 'text-ink-700/50'}">
+                <div class="font-mono text-[9.5px] tracking-wider mt-1.5 ${active || done ? 'text-[color:var(--text)] font-semibold' : 'text-[color:var(--text-faint)]'}">
                   ${t.status.replace(/_/g,' ')}
                 </div>
               </div>
@@ -1273,7 +1538,7 @@ function viewCase() {
       </div>
 
       ${actions.length > 0 ? `
-        <div class="pt-4 border-t border-ink-200">
+        <div class="pt-4 border-t border-[var(--border)]">
           <label class="lbl">Comments / reason</label>
           <input type="text" id="action-comments" class="field mb-3" placeholder="Optional note for the audit log">
           <div class="flex flex-wrap gap-2">
@@ -1285,7 +1550,7 @@ function viewCase() {
           </div>
         </div>
       ` : `
-        <div class="pt-4 border-t border-ink-200 text-[13px] text-ink-700/60">
+        <div class="pt-4 border-t border-[var(--border)] text-[13px] text-[color:var(--text-muted)]">
           ${c.status === 'CLOSED' || c.status === 'ARCHIVED'
             ? 'Case is closed. No workflow actions available.'
             : 'No actions available to you at this stage.'}
@@ -1295,9 +1560,9 @@ function viewCase() {
 
     <!-- serials -->
     <div class="card mb-6">
-      <div class="p-6 border-b border-ink-200 flex items-center gap-3">
+      <div class="p-6 border-b border-[var(--border)] flex items-center gap-3">
         <div class="flex-1">
-          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ Serial Documents</div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">§ Serial Documents</div>
           <h2 class="font-display text-2xl font-semibold mt-1">${docs.length} serial${docs.length!==1?'s':''} filed</h2>
         </div>
         ${canEdit ? `
@@ -1305,12 +1570,12 @@ function viewCase() {
         ` : ''}
       </div>
       ${docs.length === 0 ? `
-        <div class="p-12 text-center text-ink-700/60 text-sm">
+        <div class="p-12 text-center text-[color:var(--text-muted)] text-sm">
           No documents filed yet.
           ${canEdit ? ' Use the button above to file the first FD-302, EC, or evidence log.' : ''}
         </div>
       ` : `
-        <table class="dossier">
+        <div class="table-wrap"><table class="dossier">
           <thead>
             <tr>
               <th class="w-12">#</th>
@@ -1326,37 +1591,37 @@ function viewCase() {
             ${docs.map(d => `
               <tr onclick="openDocumentModal('${d.id}')">
                 <td class="font-mono num text-[13px] no-hover">${String(d.serialIndex).padStart(3,'0')}</td>
-                <td><span class="font-mono text-[11px] bg-ink-100 px-2 py-1 rounded">${esc(d.documentType.replace('_','-'))}</span></td>
+                <td><span class="font-mono text-[11px] bg-[var(--ink-100)] px-2 py-1 rounded">${esc(d.documentType.replace('_','-'))}</span></td>
                 <td class="font-medium">${esc(d.title)}</td>
-                <td class="font-mono text-[12px] text-ink-700/70">
+                <td class="font-mono text-[12px] text-[color:var(--text-muted)]">
                   ${esc(d.originalFilename || '—')}
                   <div class="text-[10.5px]">${fmtBytes(d.sizeBytes)}</div>
                 </td>
                 <td><span class="badge pstat-${d.processingStatus}">${d.processingStatus.replace(/_/g,' ')}</span></td>
-                <td class="text-[12px]">${dateFmt(d.uploadedAt)}<div class="text-[10.5px] text-ink-700/60">${esc(d.uploadedBy || '')}</div></td>
+                <td class="text-[12px]">${dateFmt(d.uploadedAt)}<div class="text-[10.5px] text-[color:var(--text-muted)]">${esc(d.uploadedBy || '')}</div></td>
                 <td class="text-right">
                   <button onclick="event.stopPropagation(); simulateDownload('${d.id}')" class="btn btn-ghost btn-sm">${iconDownload()}</button>
                 </td>
               </tr>
             `).join('')}
           </tbody>
-        </table>
+        </table></div>
       `}
     </div>
 
     <!-- case-scoped audit -->
     <div class="card p-6">
-      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-4">§ Case Audit Trail</div>
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)] mb-4">§ Case Audit Trail</div>
       <div class="space-y-2">
         ${Store.audit.filter(a => a.caseNumber === c.caseNumber).slice(0, 20).map(a => `
-          <div class="flex items-start gap-3 py-2 border-b border-ink-100 last:border-0">
-            <div class="font-mono text-[10.5px] tracking-wider text-ink-700/60 w-32 flex-shrink-0">${timeAgo(a.occurredAt)}</div>
-            <div class="font-mono text-[11px] bg-ink-100 px-2 py-0.5 rounded w-44 flex-shrink-0">${esc(a.action)}</div>
+          <div class="flex items-start gap-3 py-2 border-b last:border-0" style="border-color: var(--ink-100)">
+            <div class="font-mono text-[10.5px] tracking-wider text-[color:var(--text-muted)] w-32 flex-shrink-0">${timeAgo(a.occurredAt)}</div>
+            <div class="font-mono text-[11px] bg-[var(--ink-100)] px-2 py-0.5 rounded w-44 flex-shrink-0">${esc(a.action)}</div>
             <div class="text-[13px] flex-1">
               <span class="font-medium">${esc(a.actorUsername)}</span> — ${esc(a.outcome || '')}
             </div>
           </div>
-        `).join('') || `<div class="text-sm text-ink-700/60 py-4 text-center">No events.</div>`}
+        `).join('') || `<div class="text-sm text-[color:var(--text-muted)] py-4 text-center">No events.</div>`}
       </div>
     </div>
   `, c.caseNumber);
@@ -1432,9 +1697,9 @@ function openUploadModal(caseId) {
   modal.onclick = e => { if (e.target === modal) closeModal(); };
   modal.innerHTML = `
     <div class="modal">
-      <div class="p-6 border-b border-ink-200 flex items-center justify-between">
+      <div class="p-6 border-b border-[var(--border)] flex items-center justify-between">
         <div>
-          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">File a serial</div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">File a serial</div>
           <h2 class="font-display text-2xl font-semibold mt-1">New document</h2>
         </div>
         <button onclick="closeModal()" class="btn btn-ghost btn-sm">${iconX()}</button>
@@ -1457,10 +1722,10 @@ function openUploadModal(caseId) {
         <div>
           <label class="lbl">File *</label>
           <input name="file" type="file" required
-                 class="block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-ink-800 file:text-paper file:font-medium file:px-4 file:py-2 file:hover:bg-ink-700 file:cursor-pointer">
+                 class="block w-full text-sm upload-file">
         </div>
-        <div class="pt-3 border-t border-ink-200 flex items-center gap-3">
-          <div class="text-[11px] text-ink-700/60 flex-1">
+        <div class="pt-3 border-t border-[var(--border)] flex items-center gap-3">
+          <div class="text-[11px] text-[color:var(--text-muted)] flex-1">
             Upload is simulated. The file binary is NOT stored; only metadata.
             Processing pipeline (scan → convert → OCR → index) runs as a simulated animation.
           </div>
@@ -1549,15 +1814,15 @@ function openDocumentModal(docId) {
   modal.innerHTML = `
     <div class="modal" style="max-width:720px">
       <div class="classbanner">UNCLASSIFIED // FOUO // DEMO</div>
-      <div class="p-6 border-b border-ink-200 flex items-start justify-between gap-4">
+      <div class="p-6 border-b border-[var(--border)] flex items-start justify-between gap-4">
         <div class="flex-1">
-          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">
             Serial #${String(d.serialIndex).padStart(3,'0')} · <span class="casenum">${esc(c.caseNumber)}</span>
           </div>
           <h2 class="font-display text-2xl font-semibold mt-1 leading-snug">${esc(d.title)}</h2>
           <div class="mt-2 flex items-center gap-2">
-            <span class="font-mono text-[11px] bg-ink-100 px-2 py-1 rounded">${esc(d.documentType.replace('_','-'))}</span>
-            <span class="text-sm text-ink-700/70">${esc(docType?.label || '')}</span>
+            <span class="font-mono text-[11px] bg-[var(--ink-100)] px-2 py-1 rounded">${esc(d.documentType.replace('_','-'))}</span>
+            <span class="text-sm text-[color:var(--text-muted)]">${esc(docType?.label || '')}</span>
             <span class="badge pstat-${d.processingStatus}">${d.processingStatus.replace(/_/g,' ')}</span>
           </div>
         </div>
@@ -1570,19 +1835,19 @@ function openDocumentModal(docId) {
           <div><div class="lbl">Size</div><div class="mt-0.5">${fmtBytes(d.sizeBytes)}</div></div>
           <div><div class="lbl">Uploaded</div><div class="mt-0.5">${dateFmt(d.uploadedAt)}</div></div>
           <div><div class="lbl">Uploaded by</div><div class="mt-0.5">${esc(d.uploadedBy || '—')}</div></div>
-          <div><div class="lbl">Chain-of-custody</div><div class="font-mono text-[11px] mt-0.5 break-all text-ink-700/70">${esc((d.sha256 || '—').slice(0,32))}...</div></div>
+          <div><div class="lbl">Chain-of-custody</div><div class="font-mono text-[11px] mt-0.5 break-all text-[color:var(--text-muted)]">${esc((d.sha256 || '—').slice(0,32))}...</div></div>
         </div>
 
         ${d.extractedText ? `
           <div>
             <div class="lbl mb-2">Extracted text (OCR / embedded)</div>
-            <div class="bg-ink-50 border border-ink-200 rounded p-4 text-[13px] leading-relaxed max-h-64 overflow-y-auto font-serif">
+            <div class="bg-[var(--bg-alt)] border border-[var(--border)] rounded p-4 text-[13px] leading-relaxed max-h-64 overflow-y-auto font-serif">
               ${esc(d.extractedText)}
             </div>
           </div>
         ` : ''}
 
-        <div class="pt-4 border-t border-ink-200 flex items-center gap-2">
+        <div class="pt-4 border-t border-[var(--border)] flex items-center gap-2">
           <button onclick="simulateDownload('${d.id}')" class="btn btn-pri">${iconDownload()} Download (simulated)</button>
           <div class="flex-1"></div>
           <button onclick="closeModal()" class="btn btn-ghost">Close</button>
@@ -1608,9 +1873,9 @@ let searchState = { q:'', results:null, classificationFilter:'', typeFilter:'' }
 function viewSearch() {
   return shell(`
     <div class="mb-6">
-      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Full-Text Search</div>
-      <h1 class="font-display text-4xl font-semibold mt-1">Search</h1>
-      <div class="text-ink-700/70 text-sm mt-1.5">Across titles, descriptions, OCR text, and case metadata.</div>
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">Full-Text Search</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 page-h1">Search</h1>
+      <div class="text-[color:var(--text-muted)] text-sm mt-1.5">Across titles, descriptions, OCR text, and case metadata.</div>
     </div>
 
     <div class="card p-5 mb-5">
@@ -1623,16 +1888,16 @@ function viewSearch() {
         <button class="btn btn-pri" type="submit">${iconSearchSm()} Search</button>
       </form>
 
-      <div class="mt-4 flex items-center gap-3 text-[11px] font-mono tracking-wider text-ink-700/60">
+      <div class="mt-4 flex items-center gap-3 text-[11px] font-mono tracking-wider text-[color:var(--text-muted)]">
         <span>EXAMPLES:</span>
         ${['robbery','intrusion','FD-302','cyber','Hudson','kickback','OneDrive'].map(ex => `
-          <button onclick="quickSearch('${ex}')" class="hover:text-ink-900 underline underline-offset-2">${ex}</button>
+          <button onclick="quickSearch('${ex}')" class="hover:text-[color:var(--text)] underline underline-offset-2">${ex}</button>
         `).join('')}
       </div>
     </div>
 
     ${searchState.results ? renderSearchResults() : `
-      <div class="card p-12 text-center text-ink-700/60 text-sm">
+      <div class="card p-12 text-center text-[color:var(--text-muted)] text-sm">
         Enter a query above to search across all indexed documents.
       </div>
     `}
@@ -1645,7 +1910,7 @@ function renderSearchResults() {
     <div class="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-5">
       <!-- facets -->
       <div class="card p-5 h-fit">
-        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-3">Facets</div>
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)] mb-3">Facets</div>
 
         <div class="mb-5">
           <div class="lbl mb-2">Classification</div>
@@ -1653,7 +1918,7 @@ function renderSearchResults() {
             ${r.classFacets.map(f => `
               <button onclick="toggleFacet('classificationFilter','${f.key}')"
                       class="w-full text-left flex items-center gap-2 text-[13px] px-2 py-1 rounded
-                             ${searchState.classificationFilter === f.key ? 'bg-ink-800 text-paper' : 'hover:bg-ink-50'}">
+                             ${searchState.classificationFilter === f.key ? '" style="background:var(--text);color:var(--bg)' : 'hover:bg-[var(--bg-alt)]'}">
                 <span class="font-mono flex-1">${esc(f.key)}</span>
                 <span class="font-mono text-[11px] num">${f.count}</span>
               </button>
@@ -1667,7 +1932,7 @@ function renderSearchResults() {
             ${r.typeFacets.map(f => `
               <button onclick="toggleFacet('typeFilter','${f.key}')"
                       class="w-full text-left flex items-center gap-2 text-[13px] px-2 py-1 rounded
-                             ${searchState.typeFilter === f.key ? 'bg-ink-800 text-paper' : 'hover:bg-ink-50'}">
+                             ${searchState.typeFilter === f.key ? '" style="background:var(--text);color:var(--bg)' : 'hover:bg-[var(--bg-alt)]'}">
                 <span class="font-mono flex-1">${esc(f.key.replace('_','-'))}</span>
                 <span class="font-mono text-[11px] num">${f.count}</span>
               </button>
@@ -1682,41 +1947,41 @@ function renderSearchResults() {
 
       <!-- hits -->
       <div class="card">
-        <div class="p-5 border-b border-ink-200 flex items-center justify-between">
-          <div class="font-mono text-[11px] tracking-wider text-ink-700/70 num">
+        <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
+          <div class="font-mono text-[11px] tracking-wider text-[color:var(--text-muted)] num">
             ${r.total} hit${r.total !== 1 ? 's' : ''} · ${r.tookMs}ms
           </div>
-          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">
-            Query: <span class="text-ink-900">"${esc(searchState.q)}"</span>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">
+            Query: <span class="text-[color:var(--text)]">"${esc(searchState.q)}"</span>
           </div>
         </div>
 
         ${r.hits.length === 0 ? `
-          <div class="p-12 text-center text-ink-700/60 text-sm">No hits. Try broader terms.</div>
+          <div class="p-12 text-center text-[color:var(--text-muted)] text-sm">No hits. Try broader terms.</div>
         ` : `
           <div>
             ${r.hits.map(h => {
               const c = Store.cases.find(x => x.id === h.caseId);
               const d = Store.docs.find(x => x.id === h.id);
               return `
-                <div class="p-5 border-b border-ink-100 last:border-0 hover:bg-ink-50/50 cursor-pointer" onclick="Router.go('case',{id:'${h.caseId}'})">
+                <div class="p-5 border-b last:border-0" style="border-color: var(--ink-100) hover:bg-[var(--bg-alt)] cursor-pointer" onclick="Router.go('case',{id:'${h.caseId}'})">
                   <div class="flex items-start gap-3">
                     <div class="flex-1 min-w-0">
                       <div class="flex items-baseline gap-2 flex-wrap">
                         <span class="casenum text-[13px]">${esc(c?.caseNumber || '')}</span>
-                        <span class="text-ink-700/50">·</span>
-                        <span class="font-mono text-[11px] text-ink-700/70">Serial #${String(d?.serialIndex || 0).padStart(3,'0')}</span>
-                        <span class="font-mono text-[11px] bg-ink-100 px-1.5 py-0.5 rounded">${esc((d?.documentType || '').replace('_','-'))}</span>
+                        <span class="text-[color:var(--text-faint)]">·</span>
+                        <span class="font-mono text-[11px] text-[color:var(--text-muted)]">Serial #${String(d?.serialIndex || 0).padStart(3,'0')}</span>
+                        <span class="font-mono text-[11px] bg-[var(--ink-100)] px-1.5 py-0.5 rounded">${esc((d?.documentType || '').replace('_','-'))}</span>
                       </div>
                       <div class="font-medium mt-1">${highlight(d?.title || '', searchState.q)}</div>
                       ${d?.extractedText ? `
-                        <div class="text-[13px] text-ink-700/80 mt-2 leading-relaxed">
+                        <div class="text-[13px] text-[color:var(--text-muted)]/80 mt-2 leading-relaxed">
                           …${highlight(snippet(d.extractedText, searchState.q), searchState.q)}…
                         </div>
                       ` : ''}
                     </div>
-                    <div class="font-mono text-[10.5px] text-ink-700/60 text-right flex-shrink-0">
-                      score<br><span class="text-ink-900 font-semibold">${h.score.toFixed(2)}</span>
+                    <div class="font-mono text-[10.5px] text-[color:var(--text-muted)] text-right flex-shrink-0">
+                      score<br><span class="text-[color:var(--text)] font-semibold">${h.score.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -1836,15 +2101,15 @@ function viewWorkflows() {
 
   return shell(`
     <div class="mb-6">
-      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Temporal Orchestration</div>
-      <h1 class="font-display text-4xl font-semibold mt-1">Workflows</h1>
-      <div class="text-ink-700/70 text-sm mt-1.5">Live view of long-running case-lifecycle workflows and document ingest pipelines.</div>
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">Temporal Orchestration</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 page-h1">Workflows</h1>
+      <div class="text-[color:var(--text-muted)] text-sm mt-1.5">Live view of long-running case-lifecycle workflows and document ingest pipelines.</div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
       <!-- state machine card -->
       <div class="card p-6">
-        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-2">Case lifecycle · state machine</div>
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)] mb-2">Case lifecycle · state machine</div>
         <h2 class="font-display text-xl font-semibold mb-5">Current distribution</h2>
         <svg viewBox="0 0 420 280" class="w-full h-auto">
           ${stateMachineSvg(activeByStatus)}
@@ -1855,10 +2120,10 @@ function viewWorkflows() {
       <div class="card p-6">
         <div class="flex items-center justify-between mb-5">
           <div>
-            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">Document Ingest · Temporal Pipeline</div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">Document Ingest · Temporal Pipeline</div>
             <h2 class="font-display text-xl font-semibold mt-1">In-flight documents</h2>
           </div>
-          <div class="font-mono text-[11px] tracking-wider text-ink-700/70 num">
+          <div class="font-mono text-[11px] tracking-wider text-[color:var(--text-muted)] num">
             ${pipelineDocs.length} running · ${Store.docs.filter(d => d.processingStatus === 'INDEXED').length} complete
           </div>
         </div>
@@ -1870,14 +2135,14 @@ function viewWorkflows() {
             return `
               <div class="flex items-center gap-3 text-[13px]">
                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-mono font-bold flex-shrink-0
-                            bg-ink-100 text-ink-700 ${count > 0 && s !== 'INDEXED' ? 'pulse' : ''}">${i+1}</div>
+                            bg-[var(--ink-100)] text-[color:var(--text-muted)] ${count > 0 && s !== 'INDEXED' ? 'pulse' : ''}">${i+1}</div>
                 <div class="flex-1">
                   <div class="flex justify-between items-baseline">
                     <span class="font-mono text-[11px] tracking-wider">${s.replace(/_/g,' ')}</span>
-                    <span class="font-mono text-[11px] num text-ink-700/70">${count}</span>
+                    <span class="font-mono text-[11px] num text-[color:var(--text-muted)]">${count}</span>
                   </div>
-                  <div class="h-1.5 bg-ink-100 rounded-full mt-1 overflow-hidden">
-                    <div class="h-full bg-ink-800" style="width:${pct}%"></div>
+                  <div class="h-1.5 bg-[var(--ink-100)] rounded-full mt-1 overflow-hidden">
+                    <div class="h-full bg-[var(--text)]" style="width:${pct}%"></div>
                   </div>
                 </div>
               </div>
@@ -1886,7 +2151,7 @@ function viewWorkflows() {
         </div>
 
         ${pipelineDocs.length > 0 ? `
-          <div class="mt-5 pt-5 border-t border-ink-200">
+          <div class="mt-5 pt-5 border-t border-[var(--border)]">
             <div class="lbl mb-2">Currently processing</div>
             ${pipelineDocs.map(d => {
               const c = Store.cases.find(x => x.id === d.caseId);
@@ -1894,7 +2159,7 @@ function viewWorkflows() {
                 <div class="flex items-center gap-3 py-1.5">
                   <span class="badge pstat-${d.processingStatus}">${d.processingStatus.replace(/_/g,' ')}</span>
                   <span class="text-[13px] truncate flex-1">${esc(d.title)}</span>
-                  <span class="casenum text-[11px] text-ink-700/70">${esc(c?.caseNumber || '')}</span>
+                  <span class="casenum text-[11px] text-[color:var(--text-muted)]">${esc(c?.caseNumber || '')}</span>
                 </div>
               `;
             }).join('')}
@@ -1905,11 +2170,11 @@ function viewWorkflows() {
 
     <!-- workflow list -->
     <div class="card">
-      <div class="p-5 border-b border-ink-200">
-        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">Recent workflow activity</div>
+      <div class="p-5 border-b border-[var(--border)]">
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">Recent workflow activity</div>
         <h2 class="font-display text-xl font-semibold mt-1">Case lifecycle workflows</h2>
       </div>
-      <table class="dossier">
+      <div class="table-wrap"><table class="dossier">
         <thead>
           <tr>
             <th>Workflow ID</th>
@@ -1924,7 +2189,7 @@ function viewWorkflows() {
             const assigned = Store.users.find(u => u.username === c.assignedAgentId);
             return `
               <tr onclick="Router.go('case', {id:'${c.id}'})">
-                <td><span class="font-mono text-[11px] text-ink-700/70">${esc(c.workflowId || '—')}</span></td>
+                <td><span class="font-mono text-[11px] text-[color:var(--text-muted)]">${esc(c.workflowId || '—')}</span></td>
                 <td><span class="casenum text-[13px]">${esc(c.caseNumber)}</span></td>
                 <td><span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span></td>
                 <td class="text-[13px]">${esc(assigned?.name || c.assignedAgentId || '—')}</td>
@@ -1933,7 +2198,7 @@ function viewWorkflows() {
             `;
           }).join('')}
         </tbody>
-      </table>
+      </table></div>
     </div>
   `, 'Workflows');
 }
@@ -2025,9 +2290,9 @@ function viewAudit() {
 
   return shell(`
     <div class="mb-6">
-      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Immutable Record</div>
-      <h1 class="font-display text-4xl font-semibold mt-1">Audit trail</h1>
-      <div class="text-ink-700/70 text-sm mt-1.5">Append-only log of material actions. Retention: 7 years minimum.</div>
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">Immutable Record</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 page-h1">Audit trail</h1>
+      <div class="text-[color:var(--text-muted)] text-sm mt-1.5">Append-only log of material actions. Retention: 7 years minimum.</div>
     </div>
 
     <div class="card p-4 mb-4">
@@ -2049,14 +2314,14 @@ function viewAudit() {
         ${(auditFilter.actor || auditFilter.action) ? `
           <button class="btn btn-ghost btn-sm" onclick="auditFilter={actor:'',action:''}; render()">Clear</button>
         ` : ''}
-        <div class="ml-auto font-mono text-[11px] tracking-wider text-ink-700/70 num">
+        <div class="ml-auto font-mono text-[11px] tracking-wider text-[color:var(--text-muted)] num">
           ${filtered.length} / ${Store.audit.length} events
         </div>
       </div>
     </div>
 
     <div class="card overflow-hidden">
-      <table class="dossier">
+      <div class="table-wrap"><table class="dossier">
         <thead>
           <tr>
             <th>Timestamp</th>
@@ -2069,49 +2334,476 @@ function viewAudit() {
         </thead>
         <tbody>
           ${filtered.length === 0 ? `
-            <tr><td colspan="6" class="text-center py-12 text-ink-700/60">No events match the current filters.</td></tr>
+            <tr><td colspan="6" class="text-center py-12 text-[color:var(--text-muted)]">No events match the current filters.</td></tr>
           ` : filtered.map(a => `
             <tr>
               <td class="text-[12px] whitespace-nowrap">
                 ${dateFmt(a.occurredAt)}
-                <div class="text-[10.5px] text-ink-700/60">${timeAgo(a.occurredAt)}</div>
+                <div class="text-[10.5px] text-[color:var(--text-muted)]">${timeAgo(a.occurredAt)}</div>
               </td>
               <td>
                 <div class="font-medium text-[13px]">${esc(a.actorUsername)}</div>
-                <div class="font-mono text-[10.5px] text-ink-700/60">${esc((a.actorRoles || '').replace(/ROLE_/g,''))}</div>
+                <div class="font-mono text-[10.5px] text-[color:var(--text-muted)]">${esc((a.actorRoles || '').replace(/ROLE_/g,''))}</div>
               </td>
-              <td><span class="font-mono text-[11px] bg-ink-100 px-2 py-1 rounded">${esc(a.action)}</span></td>
-              <td>${a.caseNumber ? `<a href="#case?id=${Store.cases.find(c=>c.caseNumber===a.caseNumber)?.id}" class="casenum text-[12px] hover:underline" onclick="event.stopPropagation()">${esc(a.caseNumber)}</a>` : '<span class="text-ink-700/40">—</span>'}</td>
-              <td class="font-mono text-[11px] text-ink-700/70">${esc(a.entityType || '')} ${a.entityId ? '· ' + esc(a.entityId.slice(0,12)) : ''}</td>
+              <td><span class="font-mono text-[11px] bg-[var(--ink-100)] px-2 py-1 rounded">${esc(a.action)}</span></td>
+              <td>${a.caseNumber ? `<a href="#case?id=${Store.cases.find(c=>c.caseNumber===a.caseNumber)?.id}" class="casenum text-[12px] hover:underline" onclick="event.stopPropagation()">${esc(a.caseNumber)}</a>` : '<span class="text-[color:var(--text-muted)]/40">—</span>'}</td>
+              <td class="font-mono text-[11px] text-[color:var(--text-muted)]">${esc(a.entityType || '')} ${a.entityId ? '· ' + esc(a.entityId.slice(0,12)) : ''}</td>
               <td class="text-[13px]">${esc(a.outcome || '—')}</td>
             </tr>
           `).join('')}
         </tbody>
-      </table>
+      </table></div>
     </div>
   `, 'Audit trail');
 }
 
-// ── Administration ────────────────────────────────────────────────
+// ── Map view ──────────────────────────────────────────────────────
+let mapState = {
+  filter: { status:'', classification:'' },
+  clickToAddMode: false,
+  pendingLat: null,
+  pendingLon: null
+};
+
+function viewMap() {
+  const filtered = Store.cases.filter(c => {
+    if (!c.lat || !c.lon) return false;
+    if (mapState.filter.status && c.status !== mapState.filter.status) return false;
+    if (mapState.filter.classification && c.classificationCode !== mapState.filter.classification) return false;
+    return true;
+  });
+
+  const statusCounts = filtered.reduce((acc, c) => (acc[c.status] = (acc[c.status] || 0) + 1, acc), {});
+
+  return shell(`
+    <div class="mb-5">
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase" style="color: var(--text-muted)">Geospatial Intelligence</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 page-h1">Case map</h1>
+      <div class="text-sm mt-1.5" style="color: var(--text-muted)">Click any pin to view the case. Toggle <strong>Add mode</strong> and click the map to open a new case at that point.</div>
+    </div>
+
+    <!-- controls -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-end gap-3 flex-wrap">
+        <div class="min-w-[160px]">
+          <label class="lbl">Status</label>
+          <select class="field field-sm" onchange="mapState.filter.status=this.value; refreshMapMarkers()">
+            <option value="">All statuses</option>
+            ${['DRAFT','PENDING_APPROVAL','OPEN','SUSPENDED','CLOSURE_REVIEW','CLOSED','ARCHIVED'].map(s =>
+              `<option value="${s}" ${mapState.filter.status === s ? 'selected' : ''}>${s.replace(/_/g,' ')}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="min-w-[160px]">
+          <label class="lbl">Classification</label>
+          <select class="field field-sm" onchange="mapState.filter.classification=this.value; refreshMapMarkers()">
+            <option value="">All</option>
+            ${CLASSIFICATIONS.map(c => `<option value="${c.code}" ${mapState.filter.classification === c.code ? 'selected' : ''}>${c.code} — ${c.label}</option>`).join('')}
+          </select>
+        </div>
+        ${(mapState.filter.status || mapState.filter.classification) ? `
+          <button class="btn btn-ghost btn-sm" onclick="mapState.filter={status:'',classification:''}; refreshMapMarkers(); render()">Clear</button>
+        ` : ''}
+
+        <div class="flex-1"></div>
+
+        <div class="font-mono text-[11px] tracking-wider num" style="color: var(--text-muted)">
+          ${filtered.length} pin${filtered.length !== 1 ? 's' : ''}
+        </div>
+
+        ${Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN') ? `
+          <button id="add-mode-btn" class="btn ${mapState.clickToAddMode ? 'btn-acc' : 'btn-out'}" onclick="toggleAddMode()">
+            ${iconPin()} ${mapState.clickToAddMode ? 'Click map to place pin' : 'Add case by map click'}
+          </button>
+        ` : ''}
+      </div>
+      ${mapState.clickToAddMode ? `
+        <div class="mt-3 pt-3 border-t text-[12px] flex items-center gap-2" style="border-color: var(--border); color: var(--text-muted)">
+          <span class="font-mono tracking-wider" style="color: var(--accent)">● ADD MODE ACTIVE</span>
+          <span>Click anywhere on the map to open a new case at that location.</span>
+          <div class="flex-1"></div>
+          <button class="btn btn-ghost btn-sm" onclick="toggleAddMode()">Cancel</button>
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr,280px] gap-4">
+      <!-- map -->
+      <div class="card relative overflow-hidden" style="height: min(70vh, 640px); min-height: 420px;">
+        <div id="ol-map" class="absolute inset-0 ${mapState.clickToAddMode ? 'map-crosshair' : ''}"></div>
+        <div id="map-popup" class="map-popup hidden"></div>
+      </div>
+
+      <!-- legend + list -->
+      <div class="flex flex-col gap-4">
+        <div class="card p-4">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase mb-3" style="color: var(--text-muted)">Legend — by status</div>
+          <div class="space-y-1.5 text-[13px]">
+            ${[
+              ['DRAFT',            '#8a8778'],
+              ['PENDING_APPROVAL', '#a16207'],
+              ['OPEN',             '#2f6f3a'],
+              ['SUSPENDED',        '#a5332a'],
+              ['CLOSURE_REVIEW',   '#22407a'],
+              ['CLOSED',           '#3a327a'],
+              ['ARCHIVED',         '#4b4a46']
+            ].map(([s, color]) => `
+              <div class="flex items-center gap-2">
+                <span class="w-4 h-4 rounded-full flex-shrink-0" style="background:${color}; box-shadow:0 0 0 2px var(--surface), 0 0 0 3px ${color}"></span>
+                <span class="flex-1 font-mono text-[11px] tracking-wider">${s.replace(/_/g,' ')}</span>
+                <span class="font-mono text-[11px] num" style="color: var(--text-muted)">${statusCounts[s] || 0}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="card p-4">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase mb-3" style="color: var(--text-muted)">Mapped cases</div>
+          <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+            ${filtered.slice(0, 50).map(c => `
+              <button onclick="flyToCase('${c.id}')" class="w-full text-left p-2 rounded border hover:opacity-90" style="border-color: var(--border); background: var(--bg-alt);">
+                <div class="flex items-baseline gap-2">
+                  <span class="casenum text-[11.5px]">${esc(c.caseNumber)}</span>
+                  <span class="badge status-${c.status} ml-auto">${c.status.replace(/_/g,' ')}</span>
+                </div>
+                <div class="text-[12px] mt-0.5 truncate">${esc(c.title)}</div>
+                <div class="text-[10.5px] mt-0.5" style="color: var(--text-muted)">${esc(c.location || '')}</div>
+              </button>
+            `).join('')}
+            ${filtered.length === 0 ? `<div class="text-sm py-4 text-center" style="color: var(--text-muted)">No cases match filters.</div>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  `, 'Map');
+}
+
+function toggleAddMode() {
+  if (!Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN')) {
+    toast('Your role cannot create new cases.', 'error');
+    return;
+  }
+  mapState.clickToAddMode = !mapState.clickToAddMode;
+  render();
+}
+
+function initMapView() {
+  const el = document.getElementById('ol-map');
+  if (!el || typeof ol === 'undefined') return;
+
+  const cases = Store.cases.filter(c => c.lat && c.lon);
+  const features = cases.map(c => caseToFeature(c));
+
+  const vectorSource = new ol.source.Vector({ features });
+  const vectorLayer  = new ol.layer.Vector({
+    source: vectorSource,
+    style: feat => markerStyle(feat.get('status'))
+  });
+
+  const map = new ol.Map({
+    target: el,
+    layers: [
+      new ol.layer.Tile({ source: new ol.source.OSM(), className: 'ol-tile-layer' }),
+      vectorLayer
+    ],
+    view: new ol.View({
+      center: ol.proj.fromLonLat([-95, 39]),
+      zoom: 4
+    }),
+    controls: ol.control.defaults.defaults({ attributionOptions: { collapsible: true }})
+  });
+
+  window.__mapInstance = map;
+  window.__mapVectorSource = vectorSource;
+
+  // fit to current case set if we have any
+  if (features.length) {
+    const extent = vectorSource.getExtent();
+    if (extent && isFinite(extent[0])) {
+      map.getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 8, duration: 400 });
+    }
+  }
+
+  const popup = document.getElementById('map-popup');
+  const popupOverlay = new ol.Overlay({ element: popup, stopEvent: true });
+  map.addOverlay(popupOverlay);
+  window.__mapPopupOverlay = popupOverlay;
+
+  // click handler — either show popup or place new pin
+  map.on('click', evt => {
+    if (mapState.clickToAddMode) {
+      const [lon, lat] = ol.proj.toLonLat(evt.coordinate);
+      mapState.pendingLat = lat;
+      mapState.pendingLon = lon;
+      mapState.clickToAddMode = false;
+      openNewCaseFromMap(lat, lon);
+      return;
+    }
+    const feat = map.forEachFeatureAtPixel(evt.pixel, f => f);
+    if (feat) {
+      const c = feat.get('case');
+      if (c) showMapPopup(c, evt.coordinate);
+    } else {
+      hideMapPopup();
+    }
+  });
+
+  // pointer cursor over features
+  map.on('pointermove', evt => {
+    if (mapState.clickToAddMode) {
+      el.style.cursor = 'crosshair';
+      return;
+    }
+    const hit = map.hasFeatureAtPixel(evt.pixel);
+    el.style.cursor = hit ? 'pointer' : '';
+  });
+
+  // resize handling
+  window.addEventListener('resize', () => map.updateSize());
+}
+
+function caseToFeature(c) {
+  const f = new ol.Feature({
+    geometry: new ol.geom.Point(ol.proj.fromLonLat([c.lon, c.lat])),
+    case: c, status: c.status, caseId: c.id
+  });
+  f.setId(c.id);
+  return f;
+}
+
+function markerStyle(status) {
+  const colors = {
+    DRAFT:            '#8a8778',
+    PENDING_APPROVAL: '#a16207',
+    OPEN:             '#2f6f3a',
+    SUSPENDED:        '#a5332a',
+    CLOSURE_REVIEW:   '#22407a',
+    CLOSED:           '#3a327a',
+    ARCHIVED:         '#4b4a46'
+  };
+  const color = colors[status] || '#6b695f';
+  const isDark = document.documentElement.classList.contains('dark');
+  return new ol.style.Style({
+    image: new ol.style.Circle({
+      radius: 8,
+      fill: new ol.style.Fill({ color }),
+      stroke: new ol.style.Stroke({ color: isDark ? '#1a1916' : '#ffffff', width: 2.5 })
+    })
+  });
+}
+
+function refreshMapMarkers() {
+  render();
+  // after re-render, map will re-init with fresh state
+}
+
+function showMapPopup(c, coord) {
+  const popup = document.getElementById('map-popup');
+  if (!popup) return;
+  popup.innerHTML = `
+    <div class="flex items-start gap-2 mb-2">
+      <div class="flex-1 min-w-0">
+        <div class="casenum text-[12px]">${esc(c.caseNumber)}</div>
+        <div class="text-[13px] font-medium mt-0.5 leading-snug">${esc(c.title)}</div>
+      </div>
+      <button onclick="hideMapPopup()" class="btn btn-ghost btn-sm" style="padding:2px 6px">${iconX()}</button>
+    </div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span>
+      <span class="font-mono text-[10.5px]" style="color: var(--text-muted)">${esc(c.originatingOffice)}</span>
+    </div>
+    ${c.location ? `<div class="text-[11.5px] mb-2" style="color: var(--text-muted)">📍 ${esc(c.location)}</div>` : ''}
+    <button onclick="Router.go('case',{id:'${c.id}'})" class="btn btn-pri btn-sm w-full justify-center">
+      Open case →
+    </button>
+  `;
+  popup.classList.remove('hidden');
+  window.__mapPopupOverlay?.setPosition(coord);
+}
+
+function hideMapPopup() {
+  const popup = document.getElementById('map-popup');
+  popup?.classList.add('hidden');
+  window.__mapPopupOverlay?.setPosition(undefined);
+}
+
+function flyToCase(caseId) {
+  const c = Store.cases.find(x => x.id === caseId);
+  if (!c || !c.lat || !c.lon) return;
+  const map = window.__mapInstance;
+  if (!map) return;
+  const coord = ol.proj.fromLonLat([c.lon, c.lat]);
+  map.getView().animate({ center: coord, zoom: 11, duration: 700 });
+  setTimeout(() => showMapPopup(c, coord), 750);
+}
+
+// open new case form with geo pre-filled from map click
+function openNewCaseFromMap(lat, lon) {
+  if (!Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN')) {
+    toast('Insufficient clearance to create a case.', 'error');
+    return;
+  }
+  const modal = document.createElement('div');
+  modal.id = 'modal-root';
+  modal.className = 'modal-backdrop';
+  modal.onclick = e => { if (e.target === modal) closeModal(); };
+  modal.innerHTML = `
+    <div class="modal" style="max-width:640px">
+      <div class="classbanner">UNCLASSIFIED // FOUO // DEMO</div>
+      <div class="p-6 border-b flex items-start justify-between gap-4" style="border-color: var(--border);">
+        <div class="flex-1">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase" style="color: var(--text-muted)">New Case at Location</div>
+          <h2 class="font-display text-2xl font-semibold mt-1">Pinned location</h2>
+          <div class="font-mono text-[11.5px] mt-2 flex items-center gap-3" style="color: var(--text-muted)">
+            <span>📍 ${lat.toFixed(4)}, ${lon.toFixed(4)}</span>
+            <span id="reverse-geocode" style="color: var(--accent)">resolving…</span>
+          </div>
+        </div>
+        <button onclick="closeModal()" class="btn btn-ghost btn-sm">${iconX()}</button>
+      </div>
+      <form id="map-new-case-form" class="p-6 space-y-4" onsubmit="submitMapNewCase(event, ${lat}, ${lon})">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="lbl">Classification *</label>
+            <select name="classification" class="field" required onchange="previewMapCaseNumber()">
+              <option value="">Select…</option>
+              ${CLASSIFICATIONS.map(c => `<option value="${c.code}">${c.code} — ${c.label}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Office *</label>
+            <select name="office" class="field" required onchange="previewMapCaseNumber()">
+              <option value="">Select…</option>
+              ${OFFICES.map(o => `<option value="${o.code}">${o.code} — ${o.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="rounded p-3 flex items-center gap-3" style="background: var(--bg-alt); border: 1px solid var(--border);">
+          <div class="flex-1">
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase" style="color: var(--text-muted)">Case number</div>
+            <div class="casenum text-xl mt-0.5" id="map-case-number-preview">———-——-——————</div>
+          </div>
+          <span class="stamp stamp-grey no-rotate">PREVIEW</span>
+        </div>
+        <div>
+          <label class="lbl">Title *</label>
+          <input name="title" type="text" required minlength="3" class="field" placeholder="Short title for the case">
+        </div>
+        <div>
+          <label class="lbl">Synopsis</label>
+          <textarea name="synopsis" rows="3" class="field" placeholder="Initial facts"></textarea>
+        </div>
+        <div>
+          <label class="lbl">Location label</label>
+          <input name="location" id="map-location-input" type="text" class="field" placeholder="e.g., Downtown Miami, FL">
+        </div>
+        <div>
+          <label class="lbl">Tags (comma-separated)</label>
+          <input name="tags" type="text" class="field" placeholder="e.g., observed, surveillance">
+        </div>
+        <div class="pt-3 border-t flex items-center gap-2" style="border-color: var(--border);">
+          <button type="button" onclick="closeModal()" class="btn btn-ghost">Cancel</button>
+          <div class="flex-1"></div>
+          <button type="submit" class="btn btn-pri">${iconPlus()} Create case</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  // attempt a reverse geocode using Nominatim (public OSM service)
+  reverseGeocode(lat, lon);
+}
+
+function previewMapCaseNumber() {
+  const f = document.getElementById('map-new-case-form');
+  if (!f) return;
+  const cls = f.classification.value;
+  const off = f.office.value;
+  const preview = document.getElementById('map-case-number-preview');
+  if (cls && off) {
+    const serial = nextSerial(cls, off);
+    preview.textContent = `${cls}-${off}-${String(serial).padStart(5,'0')}`;
+  } else {
+    preview.textContent = '———-——-——————';
+  }
+}
+
+async function reverseGeocode(lat, lon) {
+  const el = document.getElementById('reverse-geocode');
+  const locInput = document.getElementById('map-location-input');
+  try {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error('geocode failed');
+    const data = await resp.json();
+    const label = data.display_name
+      ? data.display_name.split(',').slice(0, 3).join(',').trim()
+      : `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+    if (el) el.textContent = label;
+    if (locInput && !locInput.value) locInput.value = label;
+  } catch (e) {
+    if (el) el.textContent = '(geocode unavailable — offline?)';
+  }
+}
+
+function submitMapNewCase(event, lat, lon) {
+  event.preventDefault();
+  const f = event.target;
+  const classCode = f.classification.value;
+  const office = f.office.value;
+  const serial = nextSerial(classCode, office);
+  const tags = f.tags.value.split(',').map(t => t.trim()).filter(Boolean);
+
+  const newCase = {
+    id: uuid(),
+    caseNumber: `${classCode}-${office}-${String(serial).padStart(5,'0')}`,
+    classificationCode: classCode,
+    originatingOffice: office,
+    serialNumber: serial,
+    title: f.title.value.trim(),
+    synopsis: f.synopsis.value.trim() || undefined,
+    status: 'DRAFT',
+    tags,
+    lat, lon,
+    location: f.location.value.trim() || `${lat.toFixed(3)}, ${lon.toFixed(3)}`,
+    assignedAgentId: Store.currentUser().username,
+    createdAt: new Date().toISOString(),
+    createdBy: Store.currentUser().username,
+    updatedAt: new Date().toISOString(),
+    workflowId: 'case-' + uuid()
+  };
+  Store.cases.unshift(newCase);
+  audit('CREATE_CASE', 'Case', newCase.id, newCase.caseNumber, 'DRAFT created from map', {
+    title: newCase.title, lat, lon
+  });
+  Store.save();
+  closeModal();
+  toast(`Case ${newCase.caseNumber} pinned at location`, 'success');
+  // re-render map with new marker
+  render();
+}
+
+
 function viewAdmin() {
   if (!Store.hasRole('SYSTEM_ADMIN')) return viewForbidden();
 
   return shell(`
     <div class="mb-6">
-      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">System Administration</div>
-      <h1 class="font-display text-4xl font-semibold mt-1">Administration</h1>
-      <div class="text-ink-700/70 text-sm mt-1.5">User directory, role assignments, and system configuration.</div>
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-[color:var(--text-muted)]">System Administration</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 page-h1">Administration</h1>
+      <div class="text-[color:var(--text-muted)] text-sm mt-1.5">User directory, role assignments, and system configuration.</div>
     </div>
 
     <div class="card mb-6">
-      <div class="p-5 border-b border-ink-200 flex items-center justify-between">
+      <div class="p-5 border-b border-[var(--border)] flex items-center justify-between">
         <div>
-          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ Directory</div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)]">§ Directory</div>
           <h2 class="font-display text-xl font-semibold mt-0.5">Users &amp; roles</h2>
         </div>
-        <span class="font-mono text-[11px] tracking-wider text-ink-700/70 num">${Store.users.length} accounts</span>
+        <span class="font-mono text-[11px] tracking-wider text-[color:var(--text-muted)] num">${Store.users.length} accounts</span>
       </div>
-      <table class="dossier">
+      <div class="table-wrap"><table class="dossier">
         <thead>
           <tr><th>Name</th><th>Username</th><th>Email</th><th>Badge</th><th>Office</th><th>Roles</th></tr>
         </thead>
@@ -2125,39 +2817,39 @@ function viewAdmin() {
               <td><span class="font-mono text-[12px]">${esc(u.office)}</span></td>
               <td>
                 <div class="flex flex-wrap gap-1">
-                  ${u.roles.map(r => `<span class="font-mono text-[10px] bg-ink-100 px-1.5 py-0.5 rounded">${esc(r.replace('ROLE_',''))}</span>`).join('')}
+                  ${u.roles.map(r => `<span class="font-mono text-[10px] bg-[var(--ink-100)] px-1.5 py-0.5 rounded">${esc(r.replace('ROLE_',''))}</span>`).join('')}
                 </div>
               </td>
             </tr>
           `).join('')}
         </tbody>
-      </table>
+      </table></div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
       <div class="card p-5">
-        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-1">§ Classifications</div>
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)] mb-1">§ Classifications</div>
         <h3 class="font-display text-lg font-semibold mb-3">Case classification codes</h3>
         <div class="space-y-1">
           ${CLASSIFICATIONS.map(c => `
             <div class="flex items-center gap-3 py-1 text-[13px]">
               <span class="font-mono font-bold w-12">${esc(c.code)}</span>
               <span class="flex-1">${esc(c.label)}</span>
-              <span class="font-mono text-[10.5px] text-ink-700/60 num">${Store.cases.filter(x => x.classificationCode === c.code).length} cases</span>
+              <span class="font-mono text-[10.5px] text-[color:var(--text-muted)] num">${Store.cases.filter(x => x.classificationCode === c.code).length} cases</span>
             </div>
           `).join('')}
         </div>
       </div>
 
       <div class="card p-5">
-        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-1">§ Offices</div>
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)] mb-1">§ Offices</div>
         <h3 class="font-display text-lg font-semibold mb-3">Field offices</h3>
         <div class="space-y-1">
           ${OFFICES.map(o => `
             <div class="flex items-center gap-3 py-1 text-[13px]">
               <span class="font-mono font-bold w-12">${esc(o.code)}</span>
               <span class="flex-1">${esc(o.label)}</span>
-              <span class="font-mono text-[10.5px] text-ink-700/60 num">${Store.cases.filter(x => x.originatingOffice === o.code).length} cases</span>
+              <span class="font-mono text-[10.5px] text-[color:var(--text-muted)] num">${Store.cases.filter(x => x.originatingOffice === o.code).length} cases</span>
             </div>
           `).join('')}
         </div>
@@ -2165,9 +2857,9 @@ function viewAdmin() {
     </div>
 
     <div class="card p-5 mt-5">
-      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-1">§ Danger zone</div>
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-[color:var(--text-muted)] mb-1">§ Danger zone</div>
       <h3 class="font-display text-lg font-semibold mb-1">Demo data management</h3>
-      <div class="text-[13px] text-ink-700/70 mb-3">All demo state lives in your browser's localStorage. Resetting restores the original seed fixtures.</div>
+      <div class="text-[13px] text-[color:var(--text-muted)] mb-3">All demo state lives in your browser's localStorage. Resetting restores the original seed fixtures.</div>
       <button onclick="if(confirm('Reset all demo data? This cannot be undone.')) Store.reset()" class="btn btn-danger">${iconReset()} Reset demo data</button>
     </div>
   `, 'Administration');
@@ -2179,7 +2871,7 @@ function viewForbidden() {
     <div class="max-w-md mx-auto text-center py-16">
       <div class="stamp stamp-red inline-flex no-rotate text-base mb-5">403 · ACCESS DENIED</div>
       <h1 class="font-display text-3xl font-semibold mt-4">Insufficient clearance</h1>
-      <p class="text-ink-700/70 mt-2 mb-6">
+      <p class="text-[color:var(--text-muted)] mt-2 mb-6">
         Your role set does not include permission for this resource. Return to the dashboard or sign in with a different identity.
       </p>
       <a href="#dashboard" class="btn btn-pri">Back to dashboard</a>
@@ -2195,11 +2887,11 @@ function openCommandPalette() {
   modal.onclick = e => { if (e.target === modal) closeModal(); };
   modal.innerHTML = `
     <div class="modal" style="max-width:560px">
-      <div class="p-4 border-b border-ink-200">
+      <div class="p-4 border-b border-[var(--border)]">
         <input id="cmd-input" type="text" class="field" autofocus placeholder="Type a case #, title, or user…" oninput="renderCmdResults()">
       </div>
       <div id="cmd-results" class="max-h-80 overflow-y-auto p-2"></div>
-      <div class="p-3 border-t border-ink-200 font-mono text-[10.5px] tracking-wider text-ink-700/60 flex items-center gap-3">
+      <div class="p-3 border-t border-[var(--border)] font-mono text-[10.5px] tracking-wider text-[color:var(--text-muted)] flex items-center gap-3">
         <span>↵ open</span><span>·</span><span>esc close</span>
       </div>
     </div>
@@ -2220,7 +2912,7 @@ function renderCmdResults() {
   if (!box) return;
   if (!q) {
     box.innerHTML = `
-      <div class="p-3 font-mono text-[11px] tracking-wider text-ink-700/60 uppercase">RECENT</div>
+      <div class="p-3 font-mono text-[11px] tracking-wider text-[color:var(--text-muted)] uppercase">RECENT</div>
       ${Store.cases.slice(0,5).map(c => cmdRow(c)).join('')}
     `;
     return;
@@ -2230,12 +2922,12 @@ function renderCmdResults() {
     (c.tags || []).some(t => t.toLowerCase().includes(q))
   ).slice(0, 10);
   box.innerHTML = matches.length ? matches.map(c => cmdRow(c)).join('') :
-    `<div class="p-6 text-center text-ink-700/60 text-sm">No cases match "${esc(q)}"</div>`;
+    `<div class="p-6 text-center text-[color:var(--text-muted)] text-sm">No cases match "${esc(q)}"</div>`;
 }
 function cmdRow(c) {
   return `
     <a data-cmd-item href="#case?id=${c.id}" onclick="closeModal()"
-       class="flex items-center gap-3 p-2.5 hover:bg-ink-100 rounded">
+       class="flex items-center gap-3 p-2.5 hover:bg-[var(--ink-100)] rounded">
       <span class="casenum text-[12px] w-36 flex-shrink-0">${esc(c.caseNumber)}</span>
       <span class="text-[13px] flex-1 truncate">${esc(c.title)}</span>
       <span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span>
@@ -2274,6 +2966,11 @@ function iconLock()      { return `<svg ${ICON}><rect x="3" y="11" width="18" he
 function iconUndo()      { return `<svg ${ICON}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`; }
 function iconLogout()    { return `<svg ${ICON}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`; }
 function iconReset()     { return `<svg ${ICON}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`; }
+function iconMap()       { return `<svg ${ICON}><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>`; }
+function iconMenu()      { return `<svg ${ICON}><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`; }
+function iconSun()       { return `<svg ${ICON}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`; }
+function iconMoon()      { return `<svg ${ICON}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`; }
+function iconPin()       { return `<svg ${ICON}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`; }
 </script>
 
 <!-- ============================================================== -->
@@ -2293,6 +2990,7 @@ function render() {
     case 'cases':     html = viewCases();     break;
     case 'new-case':  html = viewNewCase();   break;
     case 'case':      html = viewCase();      break;
+    case 'map':       html = viewMap();       break;
     case 'search':    html = viewSearch();    break;
     case 'workflows': html = viewWorkflows(); break;
     case 'audit':     html = viewAudit();     break;
@@ -2300,6 +2998,11 @@ function render() {
     default:          html = viewDashboard();
   }
   app.innerHTML = html;
+
+  // initialize the map after the DOM is laid down
+  if (Router.route === 'map') {
+    setTimeout(initMapView, 20);
+  }
 }
 
 // initial route
