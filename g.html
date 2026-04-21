@@ -1,0 +1,105 @@
+// --- Core Data & State Management ---
+// Added a sample case for Montgomery to anchor local data
+const MOCK_DATA = [
+    { id: "288A-HQ-10293", title: "Operation Phantom Thread", type: "Cyber", status: "Active", lead: "S. Rossi", loc: "Washington, D.C.", lat: 38.8951, lng: -77.0364, desc: "Ransomware investigation.", files: ["Traffic_Analysis.zip"], tasks: [], workflowState: "Active" },
+    { id: "442C-AL-55210", title: "GumpTown Logistics Audit", type: "White Collar", status: "Active", lead: "Z. Lewis", loc: "Montgomery, AL", lat: 32.3668, lng: -86.3006, desc: "Investigation into regional supply chain discrepancies.", files: ["Audit_Report_Q1.pdf"], tasks: [{desc: "Review warehouse logs", done: false}], workflowState: "Active" }
+];
+
+let cases = [];
+let map = null;
+let currentCaseId = null;
+
+function initApp() {
+    const storedData = localStorage.getItem('fbi_cases');
+    cases = storedData ? JSON.parse(storedData) : JSON.parse(JSON.stringify(MOCK_DATA));
+    saveData();
+    renderTable();
+    renderWorkflows();
+}
+
+function saveData() {
+    localStorage.setItem('fbi_cases', JSON.stringify(cases));
+}
+
+// --- Leaflet Map Integration with Geo-Capture ---
+function initMap() {
+    if (map) return; // Prevent re-initialization
+
+    map = L.map('mapContainer').setView([39.8283, -98.5795], 4);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 18
+    }).addTo(map);
+
+    // Dynamic Geo-Capture: Click map to set case location
+    map.on('click', function(e) {
+        const { lat, lng } = e.latlng;
+        openModal('addCaseModal');
+        // Pre-fill hidden or visible coordinate fields
+        document.getElementById('newLat').value = lat.toFixed(6);
+        document.getElementById('newLng').value = lng.toFixed(6);
+        document.getElementById('newLoc').value = `Point: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    });
+
+    refreshMapMarkers();
+}
+
+function refreshMapMarkers() {
+    // Clear existing markers if necessary (optional for this sim)
+    cases.forEach(c => addMapMarker(c));
+}
+
+function addMapMarker(c) {
+    if (!c.lat || !c.lng) return;
+    
+    const markerColor = c.status === 'Active' ? '#ef4444' : '#64748b';
+    const marker = L.circleMarker([c.lat, c.lng], {
+        radius: 9,
+        fillColor: markerColor,
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.9
+    }).addTo(map);
+
+    marker.bindPopup(`
+        <div class="text-slate-800 p-2">
+            <p class="font-bold border-b mb-1">${c.id}</p>
+            <p class="text-xs mb-2">${c.title}</p>
+            <button onclick="switchView('cases'); openCaseDetails('${c.id}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs w-full">View Full Record</button>
+        </div>
+    `);
+}
+
+// --- Case Creation with Dynamic Geo Data ---
+function handleNewCase(e) {
+    e.preventDefault();
+    
+    // Capture values from the form
+    const lat = parseFloat(document.getElementById('newLat').value) || 39.0;
+    const lng = parseFloat(document.getElementById('newLng').value) || -98.0;
+
+    const newCase = {
+        id: `${Math.floor(Math.random()*900 + 100)}X-HQ-${Math.floor(Math.random()*90000)}`,
+        title: document.getElementById('newTitle').value,
+        type: document.getElementById('newType').value,
+        status: "Active",
+        lead: "Field Agent",
+        loc: document.getElementById('newLoc').value,
+        lat: lat,
+        lng: lng,
+        desc: document.getElementById('newDesc').value,
+        files: ["Entry_Log.pdf"],
+        tasks: [{desc: "Initial Site Survey", done: false}],
+        workflowState: "Intelligence Gathering"
+    };
+
+    cases.push(newCase);
+    saveData();
+    
+    renderTable();
+    if(map) addMapMarker(newCase);
+    
+    closeModal('addCaseModal');
+    document.getElementById('newCaseForm').reset();
+}

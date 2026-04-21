@@ -1,0 +1,2311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SENTINEL — Case Management System (Demo)</title>
+
+<!-- Tailwind (Play CDN — demo-only) -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+
+<!-- Typography -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans:    ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+          display: ['Newsreader', 'Georgia', 'serif'],
+          mono:    ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+        },
+        colors: {
+          ink:      { 50: '#f8f7f4', 100:'#eeece3', 200:'#d9d5c3', 700:'#2a2824', 800:'#1c1b17', 900:'#111110' },
+          bureau:   { 50:'#f2f5fa', 100:'#dde5f1', 500:'#2b4b8a', 600:'#213c72', 700:'#1a2f5c', 800:'#15264a', 900:'#0f1b34' },
+          stamp:    { red:'#a5332a', amber:'#a16207', green:'#2f6f3a', blue:'#1a3a6b' },
+          paper:    '#f5f3ea'
+        },
+        boxShadow: {
+          stamp:  '0 1px 0 rgba(0,0,0,0.05), inset 0 0 0 1px rgba(165,51,42,0.5)',
+          card:   '0 1px 2px rgba(17,17,16,0.04), 0 2px 8px -2px rgba(17,17,16,0.08)'
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  :root { color-scheme: light; }
+  html, body { background: #f5f3ea; }
+
+  /* subtle paper grain */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      radial-gradient(rgba(0,0,0,0.025) 1px, transparent 1px),
+      radial-gradient(rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+    mix-blend-mode: multiply;
+    opacity: 0.6;
+  }
+  #app > * { position: relative; z-index: 1; }
+
+  /* tabular numerals for case numbers & counts */
+  .num, .mono { font-variant-numeric: tabular-nums; }
+
+  /* classification banners — top of every case view */
+  .classbanner {
+    font-family:'JetBrains Mono',monospace; letter-spacing:0.3em;
+    text-align:center; font-weight:700; font-size:11px;
+    padding:6px 8px; color:#a5332a; background:#fbe9e7;
+    border-top:1px solid #a5332a; border-bottom:1px solid #a5332a;
+  }
+
+  /* stamp component */
+  .stamp {
+    font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:0.15em;
+    border:2px solid currentColor; padding:2px 8px; border-radius:2px;
+    display:inline-flex; align-items:center; gap:6px;
+    transform: rotate(-1.5deg); text-transform:uppercase; font-size:11px;
+  }
+  .stamp-red   { color:#a5332a; background:rgba(165,51,42,0.06); }
+  .stamp-amber { color:#a16207; background:rgba(161,98,7,0.06); }
+  .stamp-green { color:#2f6f3a; background:rgba(47,111,58,0.06); }
+  .stamp-blue  { color:#1a3a6b; background:rgba(26,58,107,0.06); }
+  .stamp-grey  { color:#4b4a46; background:rgba(75,74,70,0.06); }
+
+  /* status badge (inline compact) */
+  .badge {
+    display:inline-flex; align-items:center; gap:4px;
+    font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.1em;
+    font-weight:600; text-transform:uppercase;
+    padding:2px 8px; border-radius:2px; white-space:nowrap;
+  }
+  .status-DRAFT            { background:#e8e4d4; color:#45443e; }
+  .status-PENDING_APPROVAL { background:#fbe9c5; color:#7a4f0b; }
+  .status-OPEN             { background:#d6e9d6; color:#2f6f3a; }
+  .status-SUSPENDED        { background:#f7d7d3; color:#8f2b22; }
+  .status-CLOSURE_REVIEW   { background:#d4def5; color:#22407a; }
+  .status-CLOSED           { background:#e0ddf3; color:#3a327a; }
+  .status-ARCHIVED         { background:#e5e4de; color:#4b4a46; }
+
+  /* pipeline badge */
+  .pstat-UPLOADED      { background:#e8e4d4; color:#45443e; }
+  .pstat-VIRUS_SCANNING{ background:#f7d7d3; color:#8f2b22; }
+  .pstat-CONVERTING    { background:#fbe9c5; color:#7a4f0b; }
+  .pstat-OCR_PENDING   { background:#fde9c2; color:#7a4f0b; }
+  .pstat-OCR_COMPLETE  { background:#d4def5; color:#22407a; }
+  .pstat-INDEXED       { background:#d6e9d6; color:#2f6f3a; }
+  .pstat-FAILED        { background:#f7c7c1; color:#8f2b22; }
+
+  /* rotation cancel for pagination etc. */
+  .no-rotate { transform: none !important; }
+
+  /* sidenav active */
+  .nav-link { position:relative; padding:10px 20px; color:#bcbab3; font-size:13.5px; letter-spacing:0.02em; display:flex; align-items:center; gap:10px; border-left:2px solid transparent; transition: all 0.15s; }
+  .nav-link:hover { color:#fff; background: rgba(255,255,255,0.03); }
+  .nav-link.active { color:#fff; border-left-color:#c7a35a; background: rgba(199,163,90,0.08); }
+
+  /* input polish */
+  .field { display:block; width:100%; border:1px solid #d9d5c3; background:#fff; padding:9px 12px; border-radius:3px; font-size:14px; }
+  .field:focus { outline:none; border-color:#2b4b8a; box-shadow:0 0 0 3px rgba(43,75,138,0.15); }
+  .field-sm { padding:6px 10px; font-size:13px; }
+  label.lbl { display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:#6b695f; margin-bottom:5px; font-weight:500; }
+
+  /* buttons */
+  .btn      { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13.5px; font-weight:500; letter-spacing:0.01em; border-radius:3px; transition:all 0.15s; cursor:pointer; border:1px solid transparent; white-space:nowrap; }
+  .btn-sm   { padding:5px 12px; font-size:12px; }
+  .btn-pri  { background:#1c1b17; color:#f5f3ea; }
+  .btn-pri:hover { background:#2a2824; }
+  .btn-acc  { background:#c7a35a; color:#1c1b17; font-weight:600; }
+  .btn-acc:hover { background:#b7924a; }
+  .btn-out  { background:transparent; color:#1c1b17; border-color:#1c1b17; }
+  .btn-out:hover { background:#1c1b17; color:#f5f3ea; }
+  .btn-ghost{ background:transparent; color:#6b695f; }
+  .btn-ghost:hover { background:rgba(0,0,0,0.04); color:#1c1b17; }
+  .btn-danger { background:#a5332a; color:#fff; }
+  .btn-danger:hover { background:#8a2620; }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* card surface */
+  .card { background:#fff; border:1px solid #e3dfce; border-radius:4px; box-shadow: 0 1px 2px rgba(17,17,16,0.04); }
+
+  /* case number treatment */
+  .casenum { font-family:'JetBrains Mono',monospace; font-weight:700; letter-spacing:0.05em; font-variant-numeric:tabular-nums; }
+
+  /* table */
+  table.dossier { width:100%; border-collapse:separate; border-spacing:0; }
+  table.dossier th { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:#6b695f; text-align:left; padding:10px 12px; border-bottom:1px solid #d9d5c3; background:#faf8f1; font-weight:600; }
+  table.dossier td { padding:12px; border-bottom:1px solid #eeece3; font-size:14px; vertical-align:top; }
+  table.dossier tbody tr:hover { background:#faf8f1; cursor:pointer; }
+  table.dossier tbody tr:hover td.no-hover { background:transparent; }
+
+  /* animations */
+  @keyframes stamp-in { 0%{ transform: rotate(-15deg) scale(2); opacity:0; } 60%{ transform: rotate(-2deg) scale(1.1); opacity:1; } 100%{ transform: rotate(-1.5deg) scale(1); opacity:1; } }
+  .stamp-in { animation: stamp-in 0.4s ease-out; }
+  @keyframes fade-up { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
+  .fade-up { animation: fade-up 0.3s ease-out both; }
+  @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(43,75,138,0.4);} 70%{box-shadow:0 0 0 10px rgba(43,75,138,0);} 100%{box-shadow:0 0 0 0 rgba(43,75,138,0);} }
+  .pulse { animation: pulse-ring 1.5s ease-out infinite; }
+
+  /* toast */
+  #toasts { position:fixed; top:20px; right:20px; z-index:100; display:flex; flex-direction:column; gap:8px; }
+  .toast { background:#1c1b17; color:#f5f3ea; padding:12px 18px; border-radius:3px; font-size:13.5px; box-shadow:0 10px 30px rgba(0,0,0,0.25); border-left:3px solid #c7a35a; max-width:360px; animation: fade-up 0.25s ease-out; }
+  .toast.error { border-left-color:#a5332a; }
+  .toast.success { border-left-color:#2f6f3a; }
+
+  /* modal */
+  .modal-backdrop { position:fixed; inset:0; background:rgba(17,17,16,0.55); z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .modal { background:#f5f3ea; border:1px solid #d9d5c3; border-radius:4px; max-width:600px; width:100%; max-height:90vh; overflow-y:auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+
+  /* highlight mark */
+  mark { background:#fde68a; color:inherit; padding:0 2px; border-radius:1px; }
+
+  /* scrollbar polish */
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb { background:#d9d5c3; border-radius:4px; }
+  ::-webkit-scrollbar-thumb:hover { background:#bcbab3; }
+
+  /* login screen flourish */
+  .login-bg {
+    background:
+      radial-gradient(ellipse at top left, rgba(199,163,90,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(43,75,138,0.08) 0%, transparent 50%),
+      #111110;
+  }
+  .seal-ring {
+    width:110px; height:110px; border:1px solid #c7a35a; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; position:relative;
+    margin: 0 auto;
+  }
+  .seal-ring::before {
+    content:''; position:absolute; inset:6px; border:1px dashed #c7a35a; border-radius:50%;
+  }
+  .seal-inner {
+    font-family:'Newsreader', serif; font-size:11px; letter-spacing:0.4em;
+    color:#c7a35a; font-weight:600;
+  }
+</style>
+</head>
+
+<body class="font-sans text-ink-800">
+
+<div id="toasts"></div>
+
+<div id="app"></div>
+
+<!-- ============================================================== -->
+<!--                        SEED DATA                                -->
+<!-- ============================================================== -->
+<script>
+// Demo users (mirrors the Keycloak realm-export.json)
+const SEED_USERS = [
+  { username: 'sa.admin',         name:'System Admin',  email:'sa.admin@example.gov',         badge:'SA-0001', office:'HQ', roles:['ROLE_SYSTEM_ADMIN','ROLE_AUDITOR'] },
+  { username: 'supervisor.jones', name:'Dana Jones',    email:'supervisor.jones@example.gov', badge:'SSA-1047', office:'WF', roles:['ROLE_SUPERVISOR','ROLE_AGENT'] },
+  { username: 'agent.smith',      name:'John Smith',    email:'agent.smith@example.gov',      badge:'SA-2291', office:'NY', roles:['ROLE_AGENT'] },
+  { username: 'analyst.doe',      name:'Jane Doe',      email:'analyst.doe@example.gov',      badge:'IA-0812', office:'HQ', roles:['ROLE_ANALYST'] },
+  { username: 'clerk.miller',     name:'Alex Miller',   email:'clerk.miller@example.gov',     badge:'RC-5512', office:'HQ', roles:['ROLE_RECORDS_CLERK'] },
+  { username: 'auditor.wells',    name:'Sam Wells',     email:'auditor.wells@example.gov',    badge:'AU-3301', office:'HQ', roles:['ROLE_AUDITOR'] }
+];
+
+const CLASSIFICATIONS = [
+  { code:'066', label:'Administrative Matter' },
+  { code:'089', label:'Drug Investigation' },
+  { code:'091', label:'Bank Robbery' },
+  { code:'111', label:'Violent Crime' },
+  { code:'174', label:'Bombing Matters' },
+  { code:'196', label:'Fraud Against the Government' },
+  { code:'245', label:'Domestic Terrorism' },
+  { code:'281', label:'Foreign Counterintelligence' },
+  { code:'288', label:'Cyber Intrusion' },
+  { code:'305', label:'Public Corruption' }
+];
+
+const OFFICES = [
+  { code:'HQ', label:'Headquarters' },
+  { code:'NY', label:'New York' },
+  { code:'LA', label:'Los Angeles' },
+  { code:'WF', label:'Washington Field' },
+  { code:'CH', label:'Chicago' },
+  { code:'MM', label:'Miami' },
+  { code:'SF', label:'San Francisco' }
+];
+
+const DOC_TYPES = [
+  { code:'FD_302',        label:'FD-302 Interview'   },
+  { code:'EC',            label:'Electronic Comm'    },
+  { code:'LHM',           label:'Letterhead Memo'    },
+  { code:'EVIDENCE_LOG',  label:'Evidence Log'       },
+  { code:'PHOTO',         label:'Photograph'         },
+  { code:'NOTE',          label:'Investigator Notes' },
+  { code:'AFFIDAVIT',     label:'Affidavit'          },
+  { code:'LEGAL_PROCESS', label:'Legal Process'      },
+  { code:'OTHER',         label:'Other'              }
+];
+
+// Seed cases — realistic-looking fixtures
+const SEED_CASES = [
+  {
+    id: 'c-001', caseNumber:'288-NY-48219', classificationCode:'288', originatingOffice:'NY', serialNumber: 48219,
+    title:'Intrusion Into Hudson Regional Financial — Lateral Movement Analysis',
+    synopsis:'Multi-month campaign against a regional financial services firm; initial access via spearphish, persistence via scheduled tasks, staging on compromised SharePoint. Referred by USSS.',
+    status:'OPEN', tags:['cyber','financial','APT','east-coast'],
+    assignedAgentId:'agent.smith', supervisorId:'supervisor.jones',
+    createdAt:'2026-01-08T14:11:00Z', createdBy:'agent.smith',
+    openedAt:'2026-01-12T09:20:00Z', updatedAt:'2026-04-15T18:44:00Z',
+    workflowId:'case-c-001'
+  },
+  {
+    id: 'c-002', caseNumber:'111-HQ-12345', classificationCode:'111', originatingOffice:'HQ', serialNumber: 12345,
+    title:'Armed Robbery Series — Interstate 95 Corridor',
+    synopsis:'Seven armored-vehicle robberies along the I-95 corridor Dec 2025 – Mar 2026; consistent MO, coordinated with VA, MD, DE state police.',
+    status:'OPEN', tags:['armed-robbery','multi-state','task-force'],
+    assignedAgentId:'supervisor.jones', supervisorId:'supervisor.jones',
+    createdAt:'2025-12-19T10:00:00Z', createdBy:'supervisor.jones',
+    openedAt:'2025-12-22T14:00:00Z', updatedAt:'2026-04-10T12:00:00Z',
+    workflowId:'case-c-002'
+  },
+  {
+    id: 'c-003', caseNumber:'305-WF-00877', classificationCode:'305', originatingOffice:'WF', serialNumber: 877,
+    title:'Procurement Kickback Scheme — DoD Contractor',
+    synopsis:'Whistleblower allegation of kickbacks routed through shell LLCs. Sealed grand jury.',
+    status:'PENDING_APPROVAL', tags:['public-corruption','procurement','sealed'],
+    assignedAgentId:'supervisor.jones',
+    createdAt:'2026-04-18T08:30:00Z', createdBy:'supervisor.jones',
+    updatedAt:'2026-04-19T16:12:00Z',
+    workflowId:'case-c-003'
+  },
+  {
+    id: 'c-004', caseNumber:'196-HQ-09931', classificationCode:'196', originatingOffice:'HQ', serialNumber: 9931,
+    title:'CARES Act Small-Business Loan Fraud Ring',
+    synopsis:'Organized group filing 400+ fraudulent EIDL applications using stolen PII from 2019 breach.',
+    status:'CLOSURE_REVIEW', tags:['fraud','covid','PII'],
+    assignedAgentId:'agent.smith', supervisorId:'supervisor.jones',
+    createdAt:'2023-06-14T09:00:00Z', createdBy:'agent.smith',
+    openedAt:'2023-07-01T10:00:00Z', updatedAt:'2026-04-17T13:00:00Z',
+    workflowId:'case-c-004'
+  },
+  {
+    id: 'c-005', caseNumber:'089-LA-22140', classificationCode:'089', originatingOffice:'LA', serialNumber: 22140,
+    title:'Pacific-Route Methamphetamine Distribution',
+    synopsis:'Title III intercepts pending; coordination with DEA. Two primary subjects, four couriers identified.',
+    status:'SUSPENDED', tags:['narcotics','title-iii','DEA-joint'],
+    assignedAgentId:'agent.smith', supervisorId:'supervisor.jones',
+    createdAt:'2025-09-02T09:00:00Z', createdBy:'agent.smith',
+    openedAt:'2025-09-10T14:00:00Z', updatedAt:'2026-03-21T11:00:00Z',
+    workflowId:'case-c-005'
+  },
+  {
+    id: 'c-006', caseNumber:'245-CH-03302', classificationCode:'245', originatingOffice:'CH', serialNumber: 3302,
+    title:'Threat Assessment — Online Radicalization Network',
+    synopsis:'JTTF referral; encrypted channel monitoring authorized. No imminent threat identified.',
+    status:'OPEN', tags:['terrorism','JTTF','online'],
+    assignedAgentId:'supervisor.jones', supervisorId:'supervisor.jones',
+    createdAt:'2026-02-14T07:45:00Z', createdBy:'supervisor.jones',
+    openedAt:'2026-02-16T10:00:00Z', updatedAt:'2026-04-12T09:33:00Z',
+    workflowId:'case-c-006'
+  },
+  {
+    id: 'c-007', caseNumber:'091-NY-55012', classificationCode:'091', originatingOffice:'NY', serialNumber: 55012,
+    title:'Midtown Bank Robbery — Single Subject',
+    synopsis:'Demand-note robbery, branch on 42nd & 6th. Subject fled on foot northbound. $8,440 taken.',
+    status:'CLOSED', tags:['bank-robbery','single-subject','CCTV'],
+    assignedAgentId:'agent.smith', supervisorId:'supervisor.jones',
+    createdAt:'2024-04-01T13:12:00Z', createdBy:'agent.smith',
+    openedAt:'2024-04-01T14:00:00Z', closedAt:'2024-11-08T16:00:00Z',
+    updatedAt:'2024-11-08T16:00:00Z',
+    closureReason:'Subject indicted, plead guilty. Final report filed.',
+    workflowId:'case-c-007'
+  },
+  {
+    id: 'c-008', caseNumber:'281-HQ-00127', classificationCode:'281', originatingOffice:'HQ', serialNumber: 127,
+    title:'Foreign Intelligence Officer — Recruitment Approach',
+    synopsis:'HQ-supervised FCI matter; compartmented. Read-ins limited.',
+    status:'DRAFT', tags:['FCI','compartmented'],
+    assignedAgentId:'sa.admin',
+    createdAt:'2026-04-19T11:00:00Z', createdBy:'sa.admin',
+    updatedAt:'2026-04-19T11:00:00Z',
+    workflowId:'case-c-008'
+  }
+];
+
+// Seed documents
+const SEED_DOCS = [
+  // Case 001 — cyber intrusion
+  { id:'d-001-1', caseId:'c-001', serialIndex:1, documentType:'EC', title:'Case Opening EC — Referral from USSS',
+    originalFilename:'opening_ec.pdf', contentType:'application/pdf', sizeBytes: 214_402,
+    processingStatus:'INDEXED', uploadedAt:'2026-01-08T14:30:00Z', uploadedBy:'agent.smith',
+    sha256:'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2',
+    extractedText:'Electronic Communication. Subject: Referral from United States Secret Service regarding intrusion activity observed at Hudson Regional Financial, Inc. HRF noted anomalous outbound SMB traffic beginning approximately 0200 EST on 07-DEC-2025. USSS requested FBI assistance under the joint cyber protocol.' },
+  { id:'d-001-2', caseId:'c-001', serialIndex:2, documentType:'FD_302', title:'Interview of Network Administrator — HRF',
+    originalFilename:'fd302_interview_netadmin.pdf', contentType:'application/pdf', sizeBytes: 412_981,
+    processingStatus:'INDEXED', uploadedAt:'2026-01-15T10:44:00Z', uploadedBy:'agent.smith',
+    sha256:'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3',
+    extractedText:'FD-302. Interviewee stated that on the morning of 07-DEC-2025 he observed a scheduled task named "OneDriveSync" running under the SYSTEM account which was not part of any standard configuration. Upon investigation the task pointed at powershell.exe executing a base64-encoded command. The command pulled a second-stage loader from an external host.' },
+  { id:'d-001-3', caseId:'c-001', serialIndex:3, documentType:'EVIDENCE_LOG', title:'Evidence Log — Forensic Image 001 (FileServer)',
+    originalFilename:'evd_log_001.pdf', contentType:'application/pdf', sizeBytes: 88_204,
+    processingStatus:'INDEXED', uploadedAt:'2026-01-16T09:10:00Z', uploadedBy:'agent.smith',
+    sha256:'c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4',
+    extractedText:'Evidence chain of custody log. Item 1B1: Forensic disk image of HRF-FS01, SHA-256 verified at acquisition. Custody transferred to CART on 16-JAN-2026 1005 EST.' },
+  { id:'d-001-4', caseId:'c-001', serialIndex:4, documentType:'NOTE', title:'Analyst notes — indicator pivot',
+    originalFilename:'notes_pivot.docx', contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document', sizeBytes: 29_113,
+    processingStatus:'INDEXED', uploadedAt:'2026-02-03T15:20:00Z', uploadedBy:'analyst.doe',
+    sha256:'d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5',
+    extractedText:'Pivoting on the stage-2 loader hash yielded 14 related samples across VirusTotal submissions, earliest from 2024-Q3. The loader consistently reaches out to domains registered through the same privacy-protected registrar.' },
+  // Case 002 — robbery series
+  { id:'d-002-1', caseId:'c-002', serialIndex:1, documentType:'LHM', title:'LHM — I-95 Armed Robbery Series Overview',
+    originalFilename:'lhm_overview.pdf', contentType:'application/pdf', sizeBytes: 187_402,
+    processingStatus:'INDEXED', uploadedAt:'2025-12-19T11:00:00Z', uploadedBy:'supervisor.jones',
+    sha256:'e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6',
+    extractedText:'Letterhead memorandum. Seven armored-vehicle robberies along Interstate 95 since 02-DEC-2025. Subjects operate as 3-person crew, armed, body-armored, employ flash-bang diversion prior to approach. MO consistent across all incidents.' },
+  { id:'d-002-2', caseId:'c-002', serialIndex:2, documentType:'PHOTO', title:'CCTV still — Robbery #3 Exmore VA',
+    originalFilename:'cctv_exmore_still_03.jpg', contentType:'image/jpeg', sizeBytes: 2_104_922,
+    processingStatus:'OCR_COMPLETE', uploadedAt:'2026-01-05T13:11:00Z', uploadedBy:'supervisor.jones',
+    sha256:'f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7',
+    extractedText:'' },
+  { id:'d-002-3', caseId:'c-002', serialIndex:3, documentType:'FD_302', title:'Interview of Armored-Car Guard (Witness 4)',
+    originalFilename:'fd302_witness4.pdf', contentType:'application/pdf', sizeBytes: 312_401,
+    processingStatus:'INDEXED', uploadedAt:'2026-01-18T10:00:00Z', uploadedBy:'supervisor.jones',
+    sha256:'a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8',
+    extractedText:'Witness observed three masked individuals exit a dark SUV, two approaching the driver side, one the rear. The taller subject carried what the witness described as a pistol-grip shotgun. Flash-bang was deployed underhand before any verbal command.' },
+  // Case 003
+  { id:'d-003-1', caseId:'c-003', serialIndex:1, documentType:'EC', title:'Case Opening EC — Whistleblower Referral',
+    originalFilename:'whistleblower_opening.pdf', contentType:'application/pdf', sizeBytes: 164_209,
+    processingStatus:'INDEXED', uploadedAt:'2026-04-18T08:45:00Z', uploadedBy:'supervisor.jones',
+    sha256:'b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9',
+    extractedText:'Electronic communication. Whistleblower provided detailed ledger showing monthly payments from a DoD prime contractor to four separate LLCs, each beneficially owned by a single individual also holding a contracting officer position.' },
+  // Case 004 — fraud ring
+  { id:'d-004-1', caseId:'c-004', serialIndex:1, documentType:'LHM', title:'Final Prosecutive Summary — Loan Fraud Ring',
+    originalFilename:'final_summary.pdf', contentType:'application/pdf', sizeBytes: 502_401,
+    processingStatus:'INDEXED', uploadedAt:'2026-04-17T12:00:00Z', uploadedBy:'agent.smith',
+    sha256:'c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0',
+    extractedText:'Final prosecutive summary. Investigation identified 17 principals operating from three states; total loss to the government assessed at $24.8M. All principals indicted; 14 pled guilty, 3 convicted at trial. Restitution ordered totaling $21.2M.' },
+  // Case 005 — narco
+  { id:'d-005-1', caseId:'c-005', serialIndex:1, documentType:'LHM', title:'Case Opening — Pacific-Route Narcotics',
+    originalFilename:'opening_narco.pdf', contentType:'application/pdf', sizeBytes: 210_004,
+    processingStatus:'INDEXED', uploadedAt:'2025-09-02T09:15:00Z', uploadedBy:'agent.smith',
+    sha256:'d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1',
+    extractedText:'LHM. Joint FBI/DEA investigation into methamphetamine distribution operating between Los Angeles and Seattle. Primary subjects identified by vehicle telematics and pen register data.' },
+  // Case 006 — JTTF
+  { id:'d-006-1', caseId:'c-006', serialIndex:1, documentType:'EC', title:'JTTF Referral — Online Radicalization',
+    originalFilename:'jttf_referral.pdf', contentType:'application/pdf', sizeBytes: 188_204,
+    processingStatus:'INDEXED', uploadedAt:'2026-02-14T08:00:00Z', uploadedBy:'supervisor.jones',
+    sha256:'e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2',
+    extractedText:'JTTF referral. Subject of interest identified on encrypted messaging platform disseminating ideological content and engaging in operational discussion. No articulable imminent threat at time of referral.' },
+  // Case 007 — closed
+  { id:'d-007-1', caseId:'c-007', serialIndex:1, documentType:'FD_302', title:'Interview of Branch Teller',
+    originalFilename:'fd302_teller.pdf', contentType:'application/pdf', sizeBytes: 220_311,
+    processingStatus:'INDEXED', uploadedAt:'2024-04-01T15:40:00Z', uploadedBy:'agent.smith',
+    sha256:'f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3',
+    extractedText:'Teller described subject as a white male, approximately 6\'0", mid-40s, wearing a grey hoodie and sunglasses, who passed a handwritten demand note and implied he was armed.' },
+  { id:'d-007-2', caseId:'c-007', serialIndex:2, documentType:'PHOTO', title:'Demand note (photograph)',
+    originalFilename:'demand_note.jpg', contentType:'image/jpeg', sizeBytes: 1_402_008,
+    processingStatus:'INDEXED', uploadedAt:'2024-04-02T09:00:00Z', uploadedBy:'agent.smith',
+    sha256:'a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4',
+    extractedText:'This is a robbery. I have a gun. Put all the money in the bag. No dye packs. Do not press any buttons.' }
+];
+
+// Seed audit events
+const SEED_AUDIT = [
+  { id:'a-1001', occurredAt:'2026-04-19T16:12:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'SUBMIT_FOR_APPROVAL', entityType:'Case', entityId:'c-003', caseNumber:'305-WF-00877', outcome:'pending approval' },
+  { id:'a-1000', occurredAt:'2026-04-19T16:11:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-003-1', caseNumber:'305-WF-00877', outcome:'uploaded serial #1' },
+  { id:'a-0999', occurredAt:'2026-04-19T11:00:00Z', actorUsername:'sa.admin', actorRoles:'ROLE_SYSTEM_ADMIN,ROLE_AUDITOR', action:'CREATE_CASE', entityType:'Case', entityId:'c-008', caseNumber:'281-HQ-00127', outcome:'DRAFT created' },
+  { id:'a-0998', occurredAt:'2026-04-18T08:45:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-003-1', caseNumber:'305-WF-00877', outcome:'uploaded serial #1' },
+  { id:'a-0997', occurredAt:'2026-04-18T08:30:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'CREATE_CASE', entityType:'Case', entityId:'c-003', caseNumber:'305-WF-00877', outcome:'DRAFT created' },
+  { id:'a-0996', occurredAt:'2026-04-17T13:00:00Z', actorUsername:'agent.smith', actorRoles:'ROLE_AGENT', action:'REQUEST_CLOSURE', entityType:'Case', entityId:'c-004', caseNumber:'196-HQ-09931', outcome:'closure requested' },
+  { id:'a-0995', occurredAt:'2026-04-17T12:00:00Z', actorUsername:'agent.smith', actorRoles:'ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-004-1', caseNumber:'196-HQ-09931', outcome:'uploaded serial #1' },
+  { id:'a-0994', occurredAt:'2026-04-15T18:44:00Z', actorUsername:'analyst.doe', actorRoles:'ROLE_ANALYST', action:'VIEW_CASE', entityType:'Case', entityId:'c-001', caseNumber:'288-NY-48219', outcome:'detail viewed' },
+  { id:'a-0993', occurredAt:'2026-04-12T09:33:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'VIEW_CASE', entityType:'Case', entityId:'c-006', caseNumber:'245-CH-03302', outcome:'detail viewed' },
+  { id:'a-0992', occurredAt:'2026-04-10T12:00:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'UPDATE_CASE', entityType:'Case', entityId:'c-002', caseNumber:'111-HQ-12345', outcome:'fields updated' },
+  { id:'a-0991', occurredAt:'2026-03-21T11:00:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'SUSPEND_CASE', entityType:'Case', entityId:'c-005', caseNumber:'089-LA-22140', outcome:'suspended pending Title III auth' },
+  { id:'a-0990', occurredAt:'2026-02-16T10:00:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'APPROVE_CASE', entityType:'Case', entityId:'c-006', caseNumber:'245-CH-03302', outcome:'approved' },
+  { id:'a-0989', occurredAt:'2026-02-14T08:00:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-006-1', caseNumber:'245-CH-03302', outcome:'uploaded serial #1' },
+  { id:'a-0988', occurredAt:'2026-02-14T07:45:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'CREATE_CASE', entityType:'Case', entityId:'c-006', caseNumber:'245-CH-03302', outcome:'DRAFT created' },
+  { id:'a-0987', occurredAt:'2026-02-03T15:20:00Z', actorUsername:'analyst.doe', actorRoles:'ROLE_ANALYST', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-001-4', caseNumber:'288-NY-48219', outcome:'uploaded serial #4' },
+  { id:'a-0986', occurredAt:'2026-01-18T10:00:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-002-3', caseNumber:'111-HQ-12345', outcome:'uploaded serial #3' },
+  { id:'a-0985', occurredAt:'2026-01-16T09:10:00Z', actorUsername:'agent.smith', actorRoles:'ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-001-3', caseNumber:'288-NY-48219', outcome:'uploaded serial #3' },
+  { id:'a-0984', occurredAt:'2026-01-15T10:44:00Z', actorUsername:'agent.smith', actorRoles:'ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-001-2', caseNumber:'288-NY-48219', outcome:'uploaded serial #2' },
+  { id:'a-0983', occurredAt:'2026-01-12T09:20:00Z', actorUsername:'supervisor.jones', actorRoles:'ROLE_SUPERVISOR,ROLE_AGENT', action:'APPROVE_CASE', entityType:'Case', entityId:'c-001', caseNumber:'288-NY-48219', outcome:'approved' },
+  { id:'a-0982', occurredAt:'2026-01-08T14:30:00Z', actorUsername:'agent.smith', actorRoles:'ROLE_AGENT', action:'UPLOAD_DOCUMENT', entityType:'SerialDocument', entityId:'d-001-1', caseNumber:'288-NY-48219', outcome:'uploaded serial #1' },
+  { id:'a-0981', occurredAt:'2026-01-08T14:11:00Z', actorUsername:'agent.smith', actorRoles:'ROLE_AGENT', action:'CREATE_CASE', entityType:'Case', entityId:'c-001', caseNumber:'288-NY-48219', outcome:'DRAFT created' }
+];
+</script>
+
+<!-- ============================================================== -->
+<!--                        STORE / STATE                            -->
+<!-- ============================================================== -->
+<script>
+const LS = {
+  USERS:'sentinel.users', CASES:'sentinel.cases', DOCS:'sentinel.docs',
+  AUDIT:'sentinel.audit', SESSION:'sentinel.session'
+};
+
+function loadOrSeed(key, seed) {
+  const raw = localStorage.getItem(key);
+  if (raw) {
+    try { return JSON.parse(raw); } catch { /* fallthrough */ }
+  }
+  localStorage.setItem(key, JSON.stringify(seed));
+  return structuredClone(seed);
+}
+
+const Store = {
+  users:  loadOrSeed(LS.USERS,  SEED_USERS),
+  cases:  loadOrSeed(LS.CASES,  SEED_CASES),
+  docs:   loadOrSeed(LS.DOCS,   SEED_DOCS),
+  audit:  loadOrSeed(LS.AUDIT,  SEED_AUDIT),
+  session: (() => { try { return JSON.parse(localStorage.getItem(LS.SESSION)) || null; } catch { return null; } })(),
+
+  save() {
+    localStorage.setItem(LS.USERS, JSON.stringify(this.users));
+    localStorage.setItem(LS.CASES, JSON.stringify(this.cases));
+    localStorage.setItem(LS.DOCS,  JSON.stringify(this.docs));
+    localStorage.setItem(LS.AUDIT, JSON.stringify(this.audit));
+    if (this.session) localStorage.setItem(LS.SESSION, JSON.stringify(this.session));
+    else              localStorage.removeItem(LS.SESSION);
+  },
+
+  reset() {
+    [LS.USERS,LS.CASES,LS.DOCS,LS.AUDIT,LS.SESSION].forEach(k => localStorage.removeItem(k));
+    location.reload();
+  },
+
+  currentUser() {
+    if (!this.session) return null;
+    return this.users.find(u => u.username === this.session.username) || null;
+  },
+
+  login(username) {
+    const u = this.users.find(x => x.username === username);
+    if (!u) throw new Error('User not found');
+    this.session = { username:u.username, loginAt: new Date().toISOString() };
+    this.save();
+  },
+
+  logout() { this.session = null; this.save(); },
+
+  hasRole(role) {
+    const u = this.currentUser(); if (!u) return false;
+    const norm = role.startsWith('ROLE_') ? role : 'ROLE_' + role;
+    return u.roles.includes(norm);
+  },
+
+  hasAnyRole(...roles) { return roles.some(r => this.hasRole(r)); }
+};
+
+// ── helpers ────────────────────────────────────────────────────────
+function uuid() {
+  return 'id-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+}
+
+function audit(action, entityType, entityId, caseNumber, outcome, details = {}) {
+  const u = Store.currentUser();
+  Store.audit.unshift({
+    id: uuid(),
+    occurredAt: new Date().toISOString(),
+    actorUsername: u?.username || 'system',
+    actorRoles: (u?.roles || []).join(','),
+    action, entityType, entityId, caseNumber, outcome, details
+  });
+  Store.save();
+}
+
+function getCaseDocs(caseId) {
+  return Store.docs.filter(d => d.caseId === caseId).sort((a,b) => a.serialIndex - b.serialIndex);
+}
+
+function nextSerial(classCode, office) {
+  const existing = Store.cases
+    .filter(c => c.classificationCode === classCode && c.originatingOffice === office)
+    .map(c => c.serialNumber);
+  const max = existing.length ? Math.max(...existing) : 0;
+  return max + 1;
+}
+
+function dateFmt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' });
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1)    return 'just now';
+  if (m < 60)   return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24)   return h + 'h ago';
+  const d = Math.floor(h / 24);
+  if (d < 30)   return d + 'd ago';
+  const mo = Math.floor(d / 30);
+  if (mo < 12)  return mo + 'mo ago';
+  return Math.floor(mo / 12) + 'y ago';
+}
+
+function fmtBytes(n) {
+  if (n == null) return '—';
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/1024/1024).toFixed(2) + ' MB';
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+function toast(msg, kind='default') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (kind === 'error' ? 'error' : kind === 'success' ? 'success' : '');
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3500);
+}
+</script>
+
+<!-- ============================================================== -->
+<!--                       ROUTING                                   -->
+<!-- ============================================================== -->
+<script>
+const Router = {
+  route: 'dashboard',
+  params: {},
+  go(route, params = {}) {
+    this.route = route;
+    this.params = params;
+    const hash = route + (Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : '');
+    history.replaceState(null, '', '#' + hash);
+    render();
+    window.scrollTo({ top:0, behavior:'instant' });
+  },
+  fromHash() {
+    const h = location.hash.slice(1) || 'dashboard';
+    const [route, qs] = h.split('?');
+    const params = Object.fromEntries(new URLSearchParams(qs || ''));
+    this.route = route;
+    this.params = params;
+  }
+};
+window.addEventListener('hashchange', () => { Router.fromHash(); render(); });
+</script>
+
+<!-- ============================================================== -->
+<!--                         VIEWS                                   -->
+<!-- ============================================================== -->
+<script>
+// ── Login screen ──────────────────────────────────────────────────
+function viewLogin() {
+  return `
+    <div class="login-bg min-h-screen flex items-center justify-center p-6">
+      <div class="w-full max-w-md">
+        <div class="text-center mb-8">
+          <div class="seal-ring mb-5"><div class="seal-inner">SENTINEL</div></div>
+          <h1 class="font-display text-3xl font-semibold text-paper tracking-wide">Case Management System</h1>
+          <div class="mt-2 font-mono text-xs text-paper/50 tracking-[0.2em]">UNCLASSIFIED // REFERENCE</div>
+        </div>
+
+        <div class="bg-paper border border-ink-200 rounded p-7">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-800/60 mb-3">
+            Select a demo identity
+          </div>
+          <div class="space-y-2">
+            ${Store.users.map(u => `
+              <button onclick="doLogin('${u.username}')"
+                      class="w-full text-left px-4 py-3 border border-ink-200 rounded hover:border-ink-800 hover:bg-ink-50 transition flex items-center gap-3 group">
+                <div class="w-9 h-9 rounded-full bg-ink-800 text-paper flex items-center justify-center font-mono text-xs font-bold flex-shrink-0">
+                  ${u.name.split(' ').map(x => x[0]).join('').slice(0,2)}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-sm">${esc(u.name)}</div>
+                  <div class="font-mono text-[11px] text-ink-700/70 truncate">${esc(u.username)} · ${esc(u.badge)}</div>
+                </div>
+                <div class="flex flex-wrap gap-1 max-w-[150px] justify-end">
+                  ${u.roles.map(r => `<span class="font-mono text-[9px] tracking-wider bg-ink-100 px-1.5 py-0.5 rounded">${esc(r.replace('ROLE_',''))}</span>`).join('')}
+                </div>
+              </button>
+            `).join('')}
+          </div>
+
+          <div class="mt-6 pt-5 border-t border-ink-200 text-[11px] text-ink-700/70 leading-relaxed">
+            <strong class="text-stamp-red">NOTICE —</strong> This is an unclassified reference demonstration.
+            Not a CJIS-authorized system. All data is simulated and persisted in your browser only.
+          </div>
+        </div>
+
+        <div class="text-center mt-6">
+          <button onclick="Store.reset()" class="font-mono text-[11px] tracking-wider text-paper/40 hover:text-paper/70 uppercase">
+            Reset demo data
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function doLogin(username) {
+  Store.login(username);
+  toast(`Signed in as ${username}`, 'success');
+  Router.go('dashboard');
+}
+function doLogout() { Store.logout(); Router.go('login'); }
+
+// ── Shell with sidebar + top bar ──────────────────────────────────
+function shell(inner, pageLabel) {
+  const u = Store.currentUser();
+  const navItems = [
+    { id:'dashboard',  label:'Dashboard', icon: iconDashboard() },
+    { id:'cases',      label:'Cases',     icon: iconFolder()    },
+    { id:'search',     label:'Search',    icon: iconSearch()    },
+    { id:'workflows',  label:'Workflows', icon: iconWorkflow()  },
+    ...(Store.hasAnyRole('AUDITOR','SYSTEM_ADMIN')
+        ? [{ id:'audit', label:'Audit Trail', icon: iconShield() }] : []),
+    { id:'admin',      label:'Administration',  icon: iconCog(), show: Store.hasRole('SYSTEM_ADMIN') }
+  ].filter(n => n.show === undefined || n.show);
+
+  return `
+  <div class="flex min-h-screen">
+    <!-- sidebar -->
+    <aside class="w-60 bg-ink-900 text-paper flex-shrink-0 flex flex-col">
+      <div class="px-5 pt-6 pb-5 border-b border-white/5">
+        <div class="font-mono font-bold text-sm tracking-[0.4em] text-[#c7a35a]">SENTINEL</div>
+        <div class="text-[10.5px] font-mono tracking-[0.15em] text-paper/50 mt-1">CASE MGMT SYSTEM</div>
+      </div>
+      <nav class="py-3 flex-1">
+        ${navItems.map(n => `
+          <a href="#${n.id}" class="nav-link ${Router.route === n.id ? 'active' : ''}">
+            <span class="opacity-80">${n.icon}</span>
+            <span>${n.label}</span>
+          </a>
+        `).join('')}
+      </nav>
+      <div class="px-5 py-4 border-t border-white/5 text-[10.5px] font-mono tracking-wider text-paper/40">
+        <div>v1.0.0-demo</div>
+        <div class="mt-1">© Reference Impl.</div>
+      </div>
+    </aside>
+
+    <!-- main -->
+    <main class="flex-1 min-w-0 flex flex-col">
+      <!-- top classification banner -->
+      <div class="classbanner">UNCLASSIFIED // FOR DEMONSTRATION ONLY</div>
+
+      <!-- topbar -->
+      <header class="bg-paper border-b border-ink-200 px-8 py-3 flex items-center gap-4">
+        <div class="flex-1">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">${esc(pageLabel || '')}</div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="openCommandPalette()" class="font-mono text-[11px] tracking-wider text-ink-700/70 hover:text-ink-900 border border-ink-200 rounded px-3 py-1.5 flex items-center gap-2">
+            ${iconSearchSm()} <span>Jump to case…</span>
+            <span class="font-mono text-[10px] bg-ink-100 px-1.5 py-0.5 rounded ml-2">⌘ K</span>
+          </button>
+          <div class="relative">
+            <button id="user-menu-btn" onclick="toggleUserMenu()" class="flex items-center gap-2.5 px-3 py-1.5 hover:bg-ink-100 rounded">
+              <div class="w-8 h-8 rounded-full bg-ink-800 text-paper flex items-center justify-center font-mono text-[11px] font-bold">
+                ${esc(u.name.split(' ').map(x => x[0]).join('').slice(0,2))}
+              </div>
+              <div class="text-left">
+                <div class="text-[13px] font-medium leading-tight">${esc(u.name)}</div>
+                <div class="font-mono text-[10.5px] text-ink-700/70 leading-tight">${esc(u.badge)}</div>
+              </div>
+            </button>
+            <div id="user-menu" class="hidden absolute right-0 top-full mt-1 w-64 bg-paper border border-ink-200 rounded shadow-card z-20">
+              <div class="px-4 py-3 border-b border-ink-200">
+                <div class="font-medium text-sm">${esc(u.name)}</div>
+                <div class="font-mono text-[11px] text-ink-700/70">${esc(u.email)}</div>
+                <div class="mt-2 flex flex-wrap gap-1">
+                  ${u.roles.map(r => `<span class="font-mono text-[9px] bg-ink-100 px-1.5 py-0.5 rounded tracking-wider">${esc(r.replace('ROLE_',''))}</span>`).join('')}
+                </div>
+              </div>
+              <button onclick="doLogout()" class="w-full text-left px-4 py-2.5 text-sm hover:bg-ink-100 flex items-center gap-2">
+                ${iconLogout()} Sign out
+              </button>
+              <button onclick="if(confirm('Reset all demo data?')) Store.reset()" class="w-full text-left px-4 py-2.5 text-sm hover:bg-ink-100 flex items-center gap-2 text-stamp-red">
+                ${iconReset()} Reset demo data
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- content -->
+      <div class="flex-1 px-8 py-8 max-w-[1500px] w-full mx-auto fade-up">${inner}</div>
+    </main>
+  </div>
+  `;
+}
+
+function toggleUserMenu() {
+  const m = document.getElementById('user-menu');
+  if (m) m.classList.toggle('hidden');
+}
+document.addEventListener('click', e => {
+  const m = document.getElementById('user-menu');
+  const b = document.getElementById('user-menu-btn');
+  if (m && !m.classList.contains('hidden') && !m.contains(e.target) && !b?.contains(e.target)) {
+    m.classList.add('hidden');
+  }
+});
+
+// ── Dashboard ─────────────────────────────────────────────────────
+function viewDashboard() {
+  const u = Store.currentUser();
+  const cases = Store.cases;
+  const byStatus = cases.reduce((acc, c) => (acc[c.status] = (acc[c.status] || 0) + 1, acc), {});
+  const statuses = ['DRAFT','PENDING_APPROVAL','OPEN','SUSPENDED','CLOSURE_REVIEW','CLOSED','ARCHIVED'];
+  const total = cases.length;
+  const open    = byStatus.OPEN || 0;
+  const pending = byStatus.PENDING_APPROVAL || 0;
+  const closed  = (byStatus.CLOSED || 0) + (byStatus.ARCHIVED || 0);
+
+  const myCases = cases.filter(c => c.assignedAgentId === u.username);
+  const needsApproval = cases.filter(c => c.status === 'PENDING_APPROVAL');
+  const recentActivity = Store.audit.slice(0, 6);
+
+  const docsByCase = Store.docs.length;
+
+  return shell(`
+    <div class="mb-8">
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Dossier Dashboard</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 text-ink-900 tracking-tight">Good day, ${esc(u.name.split(' ')[0])}.</h1>
+      <div class="text-ink-700/70 text-sm mt-1.5">Signed in as <span class="font-mono">${esc(u.username)}</span> · ${u.roles.length} role${u.roles.length!==1?'s':''} active</div>
+    </div>
+
+    <!-- stat row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      ${statTile('TOTAL CASES', total, 'All statuses', 'border-ink-800', '#1c1b17')}
+      ${statTile('OPEN', open, 'Actively investigated', 'border-stamp-green', '#2f6f3a')}
+      ${statTile('PENDING APPROVAL', pending, 'Awaiting supervisor', 'border-stamp-amber', '#a16207')}
+      ${statTile('CLOSED / ARCHIVED', closed, 'Historical record', 'border-stamp-blue', '#1a3a6b')}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- status breakdown -->
+      <div class="card p-6 lg:col-span-2">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 01</div>
+            <h2 class="font-display text-xl font-semibold mt-0.5">Case distribution by status</h2>
+          </div>
+          <a href="#cases" class="btn btn-ghost btn-sm">View all →</a>
+        </div>
+        <div class="space-y-2.5">
+          ${statuses.map(s => {
+            const n = byStatus[s] || 0;
+            const pct = total > 0 ? (n / total * 100) : 0;
+            return `
+              <div class="flex items-center gap-3">
+                <div class="w-44 flex-shrink-0"><span class="badge status-${s}">${s.replace(/_/g,' ')}</span></div>
+                <div class="flex-1 h-5 bg-ink-100 rounded-sm overflow-hidden">
+                  <div class="h-full bg-ink-800 transition-all" style="width:${pct}%"></div>
+                </div>
+                <div class="w-12 text-right font-mono text-sm num">${n}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- approval queue -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 02</div>
+            <h2 class="font-display text-xl font-semibold mt-0.5">Approval queue</h2>
+          </div>
+          <span class="badge status-PENDING_APPROVAL">${needsApproval.length}</span>
+        </div>
+        ${needsApproval.length === 0 ? `
+          <div class="text-sm text-ink-700/60 py-6 text-center">No pending approvals.</div>
+        ` : `
+          <div class="space-y-2">
+            ${needsApproval.slice(0,5).map(c => `
+              <a href="#case?id=${c.id}" class="block p-3 rounded border border-ink-200 hover:border-ink-800 hover:bg-ink-50 transition">
+                <div class="flex items-baseline gap-2">
+                  <span class="casenum text-sm">${esc(c.caseNumber)}</span>
+                  <span class="text-[11px] text-ink-700/60">${timeAgo(c.updatedAt)}</span>
+                </div>
+                <div class="text-sm mt-1 truncate">${esc(c.title)}</div>
+              </a>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <!-- my cases -->
+      <div class="card p-6 lg:col-span-2">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 03</div>
+            <h2 class="font-display text-xl font-semibold mt-0.5">Assigned to you</h2>
+          </div>
+          <span class="font-mono text-sm text-ink-700/70 num">${myCases.length} case${myCases.length!==1?'s':''}</span>
+        </div>
+        ${myCases.length === 0 ? `
+          <div class="text-sm text-ink-700/60 py-6 text-center">You have no cases currently assigned.</div>
+        ` : `
+          <div class="space-y-1.5">
+            ${myCases.slice(0,6).map(c => `
+              <a href="#case?id=${c.id}" class="flex items-center gap-3 p-2.5 rounded hover:bg-ink-50 transition">
+                <span class="casenum text-sm w-36 flex-shrink-0">${esc(c.caseNumber)}</span>
+                <span class="text-sm flex-1 truncate">${esc(c.title)}</span>
+                <span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span>
+              </a>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <!-- recent activity -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 04</div>
+            <h2 class="font-display text-xl font-semibold mt-0.5">Recent activity</h2>
+          </div>
+          ${Store.hasAnyRole('AUDITOR','SYSTEM_ADMIN') ? `<a href="#audit" class="btn btn-ghost btn-sm">Audit →</a>` : ''}
+        </div>
+        <div class="space-y-3">
+          ${recentActivity.map(a => `
+            <div class="flex gap-3 text-sm">
+              <div class="w-1.5 flex-shrink-0 rounded-full bg-ink-800 mt-1.5 self-stretch"></div>
+              <div class="flex-1 min-w-0">
+                <div class="font-mono text-[11px] tracking-wider text-ink-700/70">${esc(a.action)}</div>
+                <div class="truncate text-[13px] mt-0.5">
+                  ${esc(a.actorUsername)} ${a.caseNumber ? `on <span class="casenum">${esc(a.caseNumber)}</span>` : ''}
+                </div>
+                <div class="text-[11px] text-ink-700/60 mt-0.5">${timeAgo(a.occurredAt)}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- system integration status -->
+    <div class="mt-8 card p-6">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ 05</div>
+          <h2 class="font-display text-xl font-semibold mt-0.5">System integration status</h2>
+        </div>
+        <span class="font-mono text-[10.5px] tracking-wider text-stamp-green">● ALL OPERATIONAL</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        ${[
+          {k:'Keycloak OIDC', v:'Online', note:'sentinel realm'},
+          {k:'PostgreSQL',    v:'Online', note:'case store · audit'},
+          {k:'Elasticsearch', v:'Online', note:`${Store.docs.length} indexed`},
+          {k:'Temporal',      v:'Online', note:'workflows active'},
+          {k:'AWS S3',        v:'Online', note:'cms-documents'},
+          {k:'AWS SQS',       v:'Online', note:'ingest + dlq'},
+          {k:'Tesseract OCR', v:'Online', note:'eng model'},
+          {k:'LibreOffice',   v:'Online', note:'headless convert'}
+        ].map(s => `
+          <div class="border border-ink-200 rounded p-3 bg-ink-50/50">
+            <div class="flex items-center justify-between">
+              <span class="text-[13px] font-medium">${esc(s.k)}</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-stamp-green"></span>
+            </div>
+            <div class="font-mono text-[10.5px] text-ink-700/60 mt-0.5">${esc(s.note)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `, 'Dashboard');
+}
+
+function statTile(label, value, note, borderClass, accentHex) {
+  return `
+    <div class="card p-5 border-t-2 ${borderClass}">
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">${label}</div>
+      <div class="font-display text-4xl font-semibold mt-2 num" style="color:${accentHex}">${value}</div>
+      <div class="text-[11px] text-ink-700/60 mt-1">${note}</div>
+    </div>
+  `;
+}
+
+// ── Cases list ─────────────────────────────────────────────────────
+let caseListFilter = { status:'', office:'', q:'' };
+
+function viewCases() {
+  const filtered = Store.cases.filter(c => {
+    if (caseListFilter.status && c.status !== caseListFilter.status) return false;
+    if (caseListFilter.office && c.originatingOffice !== caseListFilter.office) return false;
+    if (caseListFilter.q) {
+      const q = caseListFilter.q.toLowerCase();
+      if (!(c.caseNumber.toLowerCase().includes(q)
+          || c.title.toLowerCase().includes(q)
+          || (c.synopsis || '').toLowerCase().includes(q)
+          || (c.tags || []).some(t => t.toLowerCase().includes(q)))) return false;
+    }
+    return true;
+  }).sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+
+  return shell(`
+    <div class="flex items-end gap-4 mb-6">
+      <div class="flex-1">
+        <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Case Registry</div>
+        <h1 class="font-display text-4xl font-semibold mt-1">Cases</h1>
+        <div class="text-ink-700/70 text-sm mt-1.5">Browse and manage all case files.</div>
+      </div>
+      ${Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN') ? `
+        <a href="#new-case" class="btn btn-pri">${iconPlus()} Open new case</a>
+      ` : ''}
+    </div>
+
+    <!-- filter strip -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-end gap-3 flex-wrap">
+        <div class="flex-1 min-w-[220px]">
+          <label class="lbl">Search</label>
+          <input type="text" class="field field-sm" placeholder="Case #, title, tag…"
+                 value="${esc(caseListFilter.q)}"
+                 oninput="caseListFilter.q=this.value; render()">
+        </div>
+        <div>
+          <label class="lbl">Status</label>
+          <select class="field field-sm" onchange="caseListFilter.status=this.value; render()">
+            <option value="">All statuses</option>
+            ${['DRAFT','PENDING_APPROVAL','OPEN','SUSPENDED','CLOSURE_REVIEW','CLOSED','ARCHIVED'].map(s => `
+              <option value="${s}" ${caseListFilter.status === s ? 'selected' : ''}>${s.replace(/_/g,' ')}</option>
+            `).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Office</label>
+          <select class="field field-sm" onchange="caseListFilter.office=this.value; render()">
+            <option value="">All offices</option>
+            ${OFFICES.map(o => `<option value="${o.code}" ${caseListFilter.office === o.code ? 'selected' : ''}>${o.code} · ${o.label}</option>`).join('')}
+          </select>
+        </div>
+        ${(caseListFilter.q || caseListFilter.status || caseListFilter.office) ? `
+          <button class="btn btn-ghost btn-sm" onclick="caseListFilter={status:'',office:'',q:''}; render()">Clear</button>
+        ` : ''}
+        <div class="ml-auto font-mono text-[11px] tracking-wider text-ink-700/60 num">
+          ${filtered.length} / ${Store.cases.length}
+        </div>
+      </div>
+    </div>
+
+    <!-- table -->
+    <div class="card overflow-hidden">
+      <table class="dossier">
+        <thead>
+          <tr>
+            <th>Case №</th>
+            <th>Title</th>
+            <th>Classification</th>
+            <th>Office</th>
+            <th>Status</th>
+            <th class="text-right">Docs</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.length === 0 ? `
+            <tr><td colspan="7" class="text-center py-12 text-ink-700/60">No cases match the current filters.</td></tr>
+          ` : filtered.map(c => {
+              const docs = getCaseDocs(c.id);
+              return `
+                <tr onclick="Router.go('case', {id:'${c.id}'})">
+                  <td><span class="casenum text-[13px]">${esc(c.caseNumber)}</span></td>
+                  <td class="font-medium">${esc(c.title)}</td>
+                  <td>
+                    <div class="font-mono text-[12px]">${esc(c.classificationCode)}</div>
+                    <div class="text-[11px] text-ink-700/60">${esc(classLabel(c.classificationCode))}</div>
+                  </td>
+                  <td><span class="font-mono text-[12px]">${esc(c.originatingOffice)}</span></td>
+                  <td><span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span></td>
+                  <td class="text-right font-mono num">${docs.length}</td>
+                  <td class="text-[12px]">${dateFmt(c.updatedAt || c.createdAt)}<div class="text-[10.5px] text-ink-700/60">${timeAgo(c.updatedAt || c.createdAt)}</div></td>
+                </tr>
+              `;
+            }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `, 'Cases');
+}
+
+function classLabel(code) {
+  return CLASSIFICATIONS.find(c => c.code === code)?.label || '';
+}
+
+// ── New case form ─────────────────────────────────────────────────
+function viewNewCase() {
+  if (!Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN')) {
+    return viewForbidden();
+  }
+  return shell(`
+    <div class="max-w-3xl">
+      <div class="flex items-center gap-2 mb-4 text-sm">
+        <a href="#cases" class="text-ink-700/70 hover:text-ink-900">← Cases</a>
+      </div>
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">New Dossier</div>
+      <h1 class="font-display text-4xl font-semibold mt-1 mb-1">Open a new case</h1>
+      <div class="text-ink-700/70 text-sm mb-7">
+        A draft is created and assigned to you. Submit for supervisor approval to transition to OPEN.
+      </div>
+
+      <form id="new-case-form" class="card p-7 space-y-5" onsubmit="submitNewCase(event)">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="lbl">Classification *</label>
+            <select name="classification" class="field" required onchange="previewCaseNumber()">
+              <option value="">Select classification…</option>
+              ${CLASSIFICATIONS.map(c => `<option value="${c.code}">${c.code} — ${c.label}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Originating office *</label>
+            <select name="office" class="field" required onchange="previewCaseNumber()">
+              <option value="">Select office…</option>
+              ${OFFICES.map(o => `<option value="${o.code}">${o.code} — ${o.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="bg-ink-50/70 border border-ink-200 rounded p-4 flex items-center gap-4">
+          <div class="flex-1">
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">Allocated case number</div>
+            <div class="casenum text-2xl mt-1" id="case-number-preview">———-——-——————</div>
+          </div>
+          <div class="stamp stamp-grey no-rotate">PREVIEW</div>
+        </div>
+
+        <div>
+          <label class="lbl">Title *</label>
+          <input name="title" type="text" class="field" required minlength="3" maxlength="255"
+                 placeholder="e.g., Intrusion Into Hudson Regional Financial">
+        </div>
+
+        <div>
+          <label class="lbl">Synopsis</label>
+          <textarea name="synopsis" rows="5" class="field"
+                    placeholder="Initial facts, referrals, subjects of interest…"></textarea>
+        </div>
+
+        <div>
+          <label class="lbl">Tags (comma-separated)</label>
+          <input name="tags" type="text" class="field"
+                 placeholder="cyber, financial, multi-state">
+        </div>
+
+        <div class="flex items-center gap-3 pt-3 border-t border-ink-200">
+          <a href="#cases" class="btn btn-ghost">Cancel</a>
+          <div class="flex-1"></div>
+          <button type="submit" class="btn btn-pri">${iconPlus()} Create draft case</button>
+        </div>
+      </form>
+    </div>
+  `, 'New case');
+}
+
+function previewCaseNumber() {
+  const f = document.getElementById('new-case-form');
+  if (!f) return;
+  const cls = f.classification.value;
+  const off = f.office.value;
+  const preview = document.getElementById('case-number-preview');
+  if (cls && off) {
+    const serial = nextSerial(cls, off);
+    preview.textContent = `${cls}-${off}-${String(serial).padStart(5,'0')}`;
+  } else {
+    preview.textContent = '———-——-——————';
+  }
+}
+
+function submitNewCase(event) {
+  event.preventDefault();
+  const f = event.target;
+  const classCode = f.classification.value;
+  const office = f.office.value;
+  const serial = nextSerial(classCode, office);
+  const tags = f.tags.value.split(',').map(t => t.trim()).filter(Boolean);
+
+  const newCase = {
+    id: uuid(),
+    caseNumber: `${classCode}-${office}-${String(serial).padStart(5,'0')}`,
+    classificationCode: classCode,
+    originatingOffice: office,
+    serialNumber: serial,
+    title: f.title.value.trim(),
+    synopsis: f.synopsis.value.trim() || undefined,
+    status: 'DRAFT',
+    tags,
+    assignedAgentId: Store.currentUser().username,
+    createdAt: new Date().toISOString(),
+    createdBy: Store.currentUser().username,
+    updatedAt: new Date().toISOString(),
+    workflowId: 'case-' + uuid()
+  };
+  Store.cases.unshift(newCase);
+  audit('CREATE_CASE', 'Case', newCase.id, newCase.caseNumber, 'DRAFT created', { title: newCase.title });
+  Store.save();
+  toast(`Case ${newCase.caseNumber} created`, 'success');
+  Router.go('case', { id: newCase.id });
+}
+
+// ── Case detail ────────────────────────────────────────────────────
+function viewCase() {
+  const c = Store.cases.find(x => x.id === Router.params.id);
+  if (!c) return shell(`<div class="py-12 text-center text-ink-700/60">Case not found.</div>`, 'Not found');
+
+  const docs = getCaseDocs(c.id);
+  const canEdit = !['CLOSED','ARCHIVED'].includes(c.status) && Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN');
+  const assignedUser = Store.users.find(u => u.username === c.assignedAgentId);
+
+  // Workflow state machine — what actions are available?
+  const user = Store.currentUser();
+  const isOwner = c.assignedAgentId === user.username;
+  const isSupervisor = Store.hasAnyRole('SUPERVISOR','SYSTEM_ADMIN');
+  const isAgent      = Store.hasAnyRole('AGENT','SUPERVISOR','SYSTEM_ADMIN');
+
+  const actions = [];
+  if (c.status === 'DRAFT' && (isOwner || isSupervisor) && isAgent) {
+    actions.push({ key:'submit',  label:'Submit for approval', kind:'pri', icon:iconArrow() });
+  }
+  if (c.status === 'PENDING_APPROVAL' && isSupervisor) {
+    actions.push({ key:'approve', label:'Approve', kind:'acc', icon:iconCheck() });
+    actions.push({ key:'reject',  label:'Reject',  kind:'danger', icon:iconX() });
+  }
+  if (c.status === 'OPEN' && isAgent) {
+    actions.push({ key:'suspend', label:'Suspend',  kind:'out', icon:iconPause() });
+    actions.push({ key:'request-closure', label:'Request closure', kind:'pri', icon:iconLock() });
+  }
+  if (c.status === 'SUSPENDED' && isSupervisor) {
+    actions.push({ key:'resume', label:'Resume', kind:'pri', icon:iconPlay() });
+  }
+  if (c.status === 'CLOSURE_REVIEW' && isSupervisor) {
+    actions.push({ key:'confirm-closure', label:'Confirm closure', kind:'acc', icon:iconLock() });
+    actions.push({ key:'return-open', label:'Return to OPEN', kind:'out', icon:iconUndo() });
+  }
+
+  // Workflow ladder visualization
+  const timeline = [
+    { status:'DRAFT',            ts: c.createdAt },
+    { status:'PENDING_APPROVAL', ts: null },
+    { status:'OPEN',             ts: c.openedAt },
+    { status:'CLOSURE_REVIEW',   ts: null },
+    { status:'CLOSED',           ts: c.closedAt }
+  ];
+  const statusOrder = { DRAFT:0, PENDING_APPROVAL:1, OPEN:2, SUSPENDED:2, CLOSURE_REVIEW:3, CLOSED:4, ARCHIVED:4 };
+  const currentOrder = statusOrder[c.status];
+
+  return shell(`
+    <div class="flex items-center gap-2 mb-4 text-sm">
+      <a href="#cases" class="text-ink-700/70 hover:text-ink-900">← Cases</a>
+    </div>
+
+    <!-- header -->
+    <div class="card overflow-hidden mb-6">
+      <div class="classbanner">UNCLASSIFIED // FOUO // DEMO</div>
+      <div class="p-7">
+        <div class="flex items-start gap-6">
+          <div class="flex-1 min-w-0">
+            <div class="font-mono text-[10.5px] tracking-[0.2em] uppercase text-ink-700/60">Case File</div>
+            <div class="casenum text-3xl mt-1">${esc(c.caseNumber)}</div>
+            <h1 class="font-display text-2xl font-semibold mt-3 leading-snug">${esc(c.title)}</h1>
+            <div class="flex flex-wrap gap-1.5 mt-3">
+              ${(c.tags || []).map(t => `<span class="font-mono text-[11px] bg-ink-100 border border-ink-200 px-2 py-0.5 rounded-sm">${esc(t)}</span>`).join('')}
+            </div>
+          </div>
+          <div class="flex flex-col items-end gap-3 flex-shrink-0">
+            <span class="stamp ${statusStampClass(c.status)} stamp-in">${c.status.replace(/_/g,' ')}</span>
+            <div class="font-mono text-[10.5px] text-ink-700/60 text-right">
+              Serial #${String(c.serialNumber).padStart(5,'0')}<br>
+              ${classLabel(c.classificationCode)}<br>
+              ${OFFICES.find(o => o.code === c.originatingOffice)?.label}
+            </div>
+          </div>
+        </div>
+
+        ${c.synopsis ? `
+          <div class="mt-5 pt-5 border-t border-ink-200">
+            <div class="lbl mb-2">Synopsis</div>
+            <p class="text-[14px] leading-relaxed">${esc(c.synopsis)}</p>
+          </div>
+        ` : ''}
+
+        <div class="mt-5 pt-5 border-t border-ink-200 grid grid-cols-2 md:grid-cols-4 gap-5">
+          ${metaItem('Opened',   dateFmt(c.openedAt))}
+          ${metaItem('Closed',   dateFmt(c.closedAt))}
+          ${metaItem('Created',  dateFmt(c.createdAt))}
+          ${metaItem('Assigned', assignedUser ? `${assignedUser.name} (${assignedUser.badge})` : (c.assignedAgentId || '—'))}
+        </div>
+      </div>
+    </div>
+
+    <!-- workflow ladder + actions -->
+    <div class="card p-6 mb-6">
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-3">Workflow state</div>
+      <div class="flex items-center gap-2 mb-6 overflow-x-auto">
+        ${timeline.map((t, i) => {
+          const done   = statusOrder[t.status] < currentOrder;
+          const active = statusOrder[t.status] === currentOrder && c.status === t.status;
+          const isSuspended = c.status === 'SUSPENDED' && t.status === 'OPEN';
+          return `
+            <div class="flex items-center gap-2 flex-shrink-0 ${i > 0 ? 'ml-1' : ''}">
+              ${i > 0 ? `<div class="w-10 h-[2px] ${done || active ? 'bg-ink-800' : 'bg-ink-200'}"></div>` : ''}
+              <div class="flex flex-col items-center">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold
+                            ${active ? 'bg-ink-800 text-paper pulse' :
+                              done ? 'bg-ink-800 text-paper' :
+                              isSuspended ? 'bg-stamp-red text-paper' : 'bg-ink-100 text-ink-700/50 border border-ink-200'}">
+                  ${done ? '✓' : i + 1}
+                </div>
+                <div class="font-mono text-[9.5px] tracking-wider mt-1.5 ${active || done ? 'text-ink-900 font-semibold' : 'text-ink-700/50'}">
+                  ${t.status.replace(/_/g,' ')}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+        ${c.status === 'SUSPENDED' ? `
+          <div class="ml-4 stamp stamp-red">SUSPENDED</div>
+        ` : ''}
+      </div>
+
+      ${actions.length > 0 ? `
+        <div class="pt-4 border-t border-ink-200">
+          <label class="lbl">Comments / reason</label>
+          <input type="text" id="action-comments" class="field mb-3" placeholder="Optional note for the audit log">
+          <div class="flex flex-wrap gap-2">
+            ${actions.map(a => `
+              <button onclick="doCaseAction('${c.id}','${a.key}')" class="btn btn-${a.kind}">
+                ${a.icon}${a.label}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      ` : `
+        <div class="pt-4 border-t border-ink-200 text-[13px] text-ink-700/60">
+          ${c.status === 'CLOSED' || c.status === 'ARCHIVED'
+            ? 'Case is closed. No workflow actions available.'
+            : 'No actions available to you at this stage.'}
+        </div>
+      `}
+    </div>
+
+    <!-- serials -->
+    <div class="card mb-6">
+      <div class="p-6 border-b border-ink-200 flex items-center gap-3">
+        <div class="flex-1">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ Serial Documents</div>
+          <h2 class="font-display text-2xl font-semibold mt-1">${docs.length} serial${docs.length!==1?'s':''} filed</h2>
+        </div>
+        ${canEdit ? `
+          <button onclick="openUploadModal('${c.id}')" class="btn btn-pri">${iconUpload()} File a serial</button>
+        ` : ''}
+      </div>
+      ${docs.length === 0 ? `
+        <div class="p-12 text-center text-ink-700/60 text-sm">
+          No documents filed yet.
+          ${canEdit ? ' Use the button above to file the first FD-302, EC, or evidence log.' : ''}
+        </div>
+      ` : `
+        <table class="dossier">
+          <thead>
+            <tr>
+              <th class="w-12">#</th>
+              <th>Type</th>
+              <th>Title</th>
+              <th>File</th>
+              <th>Processing</th>
+              <th>Filed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${docs.map(d => `
+              <tr onclick="openDocumentModal('${d.id}')">
+                <td class="font-mono num text-[13px] no-hover">${String(d.serialIndex).padStart(3,'0')}</td>
+                <td><span class="font-mono text-[11px] bg-ink-100 px-2 py-1 rounded">${esc(d.documentType.replace('_','-'))}</span></td>
+                <td class="font-medium">${esc(d.title)}</td>
+                <td class="font-mono text-[12px] text-ink-700/70">
+                  ${esc(d.originalFilename || '—')}
+                  <div class="text-[10.5px]">${fmtBytes(d.sizeBytes)}</div>
+                </td>
+                <td><span class="badge pstat-${d.processingStatus}">${d.processingStatus.replace(/_/g,' ')}</span></td>
+                <td class="text-[12px]">${dateFmt(d.uploadedAt)}<div class="text-[10.5px] text-ink-700/60">${esc(d.uploadedBy || '')}</div></td>
+                <td class="text-right">
+                  <button onclick="event.stopPropagation(); simulateDownload('${d.id}')" class="btn btn-ghost btn-sm">${iconDownload()}</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `}
+    </div>
+
+    <!-- case-scoped audit -->
+    <div class="card p-6">
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-4">§ Case Audit Trail</div>
+      <div class="space-y-2">
+        ${Store.audit.filter(a => a.caseNumber === c.caseNumber).slice(0, 20).map(a => `
+          <div class="flex items-start gap-3 py-2 border-b border-ink-100 last:border-0">
+            <div class="font-mono text-[10.5px] tracking-wider text-ink-700/60 w-32 flex-shrink-0">${timeAgo(a.occurredAt)}</div>
+            <div class="font-mono text-[11px] bg-ink-100 px-2 py-0.5 rounded w-44 flex-shrink-0">${esc(a.action)}</div>
+            <div class="text-[13px] flex-1">
+              <span class="font-medium">${esc(a.actorUsername)}</span> — ${esc(a.outcome || '')}
+            </div>
+          </div>
+        `).join('') || `<div class="text-sm text-ink-700/60 py-4 text-center">No events.</div>`}
+      </div>
+    </div>
+  `, c.caseNumber);
+}
+
+function metaItem(label, value) {
+  return `
+    <div>
+      <div class="lbl">${label}</div>
+      <div class="text-[13.5px] mt-0.5">${esc(value)}</div>
+    </div>
+  `;
+}
+
+function statusStampClass(status) {
+  switch (status) {
+    case 'DRAFT':            return 'stamp-grey';
+    case 'PENDING_APPROVAL': return 'stamp-amber';
+    case 'OPEN':             return 'stamp-green';
+    case 'SUSPENDED':        return 'stamp-red';
+    case 'CLOSURE_REVIEW':   return 'stamp-blue';
+    case 'CLOSED':
+    case 'ARCHIVED':         return 'stamp-blue';
+    default:                 return 'stamp-grey';
+  }
+}
+
+// Case workflow actions (simulated Temporal signals)
+function doCaseAction(caseId, actionKey) {
+  const c = Store.cases.find(x => x.id === caseId);
+  if (!c) return;
+  const comments = document.getElementById('action-comments')?.value || '';
+  const now = new Date().toISOString();
+
+  const transitions = {
+    'submit':            { to:'PENDING_APPROVAL', action:'SUBMIT_FOR_APPROVAL', outcome:'pending approval' },
+    'approve':           { to:'OPEN',             action:'APPROVE_CASE',        outcome:'approved',         setOpenedAt:true },
+    'reject':            { to:'DRAFT',            action:'REJECT_CASE',         outcome:'rejected' },
+    'suspend':           { to:'SUSPENDED',        action:'SUSPEND_CASE',        outcome:'suspended' },
+    'resume':            { to:'OPEN',             action:'RESUME_CASE',         outcome:'resumed' },
+    'request-closure':   { to:'CLOSURE_REVIEW',   action:'REQUEST_CLOSURE',     outcome:'closure requested' },
+    'confirm-closure':   { to:'CLOSED',           action:'CONFIRM_CLOSURE',     outcome:'closed',           setClosedAt:true, requireReason:true },
+    'return-open':       { to:'OPEN',             action:'RETURN_TO_OPEN',      outcome:'returned to OPEN' }
+  };
+
+  const t = transitions[actionKey];
+  if (!t) return;
+
+  if (t.requireReason && !comments.trim()) {
+    toast('Please provide a closure reason in the comments field.', 'error');
+    return;
+  }
+
+  c.status = t.to;
+  c.updatedAt = now;
+  if (t.setOpenedAt && !c.openedAt) c.openedAt = now;
+  if (t.setClosedAt) { c.closedAt = now; c.closureReason = comments; }
+
+  audit(t.action, 'Case', c.id, c.caseNumber, t.outcome, { comments });
+  Store.save();
+  toast(`Case ${c.caseNumber} → ${t.to.replace(/_/g,' ')}`, 'success');
+  render();
+}
+
+// ── Upload modal ──────────────────────────────────────────────────
+let uploadingCaseId = null;
+
+function openUploadModal(caseId) {
+  uploadingCaseId = caseId;
+  const modal = document.createElement('div');
+  modal.id = 'modal-root';
+  modal.className = 'modal-backdrop';
+  modal.onclick = e => { if (e.target === modal) closeModal(); };
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="p-6 border-b border-ink-200 flex items-center justify-between">
+        <div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">File a serial</div>
+          <h2 class="font-display text-2xl font-semibold mt-1">New document</h2>
+        </div>
+        <button onclick="closeModal()" class="btn btn-ghost btn-sm">${iconX()}</button>
+      </div>
+      <form id="upload-form" class="p-6 space-y-4" onsubmit="doUpload(event)">
+        <div>
+          <label class="lbl">Document type *</label>
+          <select name="docType" class="field" required>
+            ${DOC_TYPES.map(t => `<option value="${t.code}">${t.code.replace('_','-')} — ${t.label}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Title *</label>
+          <input name="title" type="text" required class="field" placeholder="Interview of witness …">
+        </div>
+        <div>
+          <label class="lbl">Description</label>
+          <textarea name="description" rows="3" class="field" placeholder="Optional context"></textarea>
+        </div>
+        <div>
+          <label class="lbl">File *</label>
+          <input name="file" type="file" required
+                 class="block w-full text-sm file:mr-3 file:rounded file:border-0 file:bg-ink-800 file:text-paper file:font-medium file:px-4 file:py-2 file:hover:bg-ink-700 file:cursor-pointer">
+        </div>
+        <div class="pt-3 border-t border-ink-200 flex items-center gap-3">
+          <div class="text-[11px] text-ink-700/60 flex-1">
+            Upload is simulated. The file binary is NOT stored; only metadata.
+            Processing pipeline (scan → convert → OCR → index) runs as a simulated animation.
+          </div>
+          <button type="button" onclick="closeModal()" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-pri">${iconUpload()} File serial</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function closeModal() {
+  document.getElementById('modal-root')?.remove();
+}
+
+function doUpload(event) {
+  event.preventDefault();
+  const f = event.target;
+  const c = Store.cases.find(x => x.id === uploadingCaseId);
+  if (!c) return;
+
+  const file = f.file.files[0];
+  const existing = getCaseDocs(c.id);
+  const nextIdx = existing.length + 1;
+
+  const doc = {
+    id: uuid(),
+    caseId: c.id,
+    serialIndex: nextIdx,
+    documentType: f.docType.value,
+    title: f.title.value.trim(),
+    description: f.description.value.trim() || undefined,
+    originalFilename: file?.name,
+    contentType: file?.type || 'application/octet-stream',
+    sizeBytes: file?.size || 0,
+    processingStatus: 'UPLOADED',
+    uploadedAt: new Date().toISOString(),
+    uploadedBy: Store.currentUser().username,
+    sha256: Array.from({length:64}, () => '0123456789abcdef'[Math.floor(Math.random()*16)]).join(''),
+    extractedText: ''
+  };
+  Store.docs.push(doc);
+  c.updatedAt = doc.uploadedAt;
+  audit('UPLOAD_DOCUMENT', 'SerialDocument', doc.id, c.caseNumber, `uploaded serial #${nextIdx}`, { filename: doc.originalFilename, type: doc.documentType });
+  Store.save();
+  closeModal();
+  toast(`Serial #${nextIdx} filed — pipeline started`, 'success');
+
+  // Simulate the Temporal ingest workflow stages
+  simulatePipeline(doc.id);
+  render();
+}
+
+function simulatePipeline(docId) {
+  const stages = ['VIRUS_SCANNING', 'CONVERTING', 'OCR_PENDING', 'OCR_COMPLETE', 'INDEXED'];
+  let i = 0;
+  const step = () => {
+    const d = Store.docs.find(x => x.id === docId);
+    if (!d) return;
+    d.processingStatus = stages[i];
+    Store.save();
+    // Re-render if we're still looking at the case detail of this doc
+    if (Router.route === 'case' && Router.params.id === d.caseId) render();
+    i++;
+    if (i < stages.length) {
+      setTimeout(step, 800 + Math.random() * 700);
+    } else {
+      toast(`Document indexed (${stages.length} stages complete)`, 'success');
+    }
+  };
+  setTimeout(step, 600);
+}
+
+// Document detail modal
+function openDocumentModal(docId) {
+  const d = Store.docs.find(x => x.id === docId);
+  if (!d) return;
+  const c = Store.cases.find(x => x.id === d.caseId);
+  const docType = DOC_TYPES.find(t => t.code === d.documentType);
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-root';
+  modal.className = 'modal-backdrop';
+  modal.onclick = e => { if (e.target === modal) closeModal(); };
+  modal.innerHTML = `
+    <div class="modal" style="max-width:720px">
+      <div class="classbanner">UNCLASSIFIED // FOUO // DEMO</div>
+      <div class="p-6 border-b border-ink-200 flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">
+            Serial #${String(d.serialIndex).padStart(3,'0')} · <span class="casenum">${esc(c.caseNumber)}</span>
+          </div>
+          <h2 class="font-display text-2xl font-semibold mt-1 leading-snug">${esc(d.title)}</h2>
+          <div class="mt-2 flex items-center gap-2">
+            <span class="font-mono text-[11px] bg-ink-100 px-2 py-1 rounded">${esc(d.documentType.replace('_','-'))}</span>
+            <span class="text-sm text-ink-700/70">${esc(docType?.label || '')}</span>
+            <span class="badge pstat-${d.processingStatus}">${d.processingStatus.replace(/_/g,' ')}</span>
+          </div>
+        </div>
+        <button onclick="closeModal()" class="btn btn-ghost btn-sm">${iconX()}</button>
+      </div>
+      <div class="p-6 space-y-5">
+        <div class="grid grid-cols-2 gap-5 text-[13px]">
+          <div><div class="lbl">Filename</div><div class="font-mono mt-0.5 break-all">${esc(d.originalFilename || '—')}</div></div>
+          <div><div class="lbl">Content type</div><div class="font-mono mt-0.5">${esc(d.contentType || '—')}</div></div>
+          <div><div class="lbl">Size</div><div class="mt-0.5">${fmtBytes(d.sizeBytes)}</div></div>
+          <div><div class="lbl">Uploaded</div><div class="mt-0.5">${dateFmt(d.uploadedAt)}</div></div>
+          <div><div class="lbl">Uploaded by</div><div class="mt-0.5">${esc(d.uploadedBy || '—')}</div></div>
+          <div><div class="lbl">Chain-of-custody</div><div class="font-mono text-[11px] mt-0.5 break-all text-ink-700/70">${esc((d.sha256 || '—').slice(0,32))}...</div></div>
+        </div>
+
+        ${d.extractedText ? `
+          <div>
+            <div class="lbl mb-2">Extracted text (OCR / embedded)</div>
+            <div class="bg-ink-50 border border-ink-200 rounded p-4 text-[13px] leading-relaxed max-h-64 overflow-y-auto font-serif">
+              ${esc(d.extractedText)}
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="pt-4 border-t border-ink-200 flex items-center gap-2">
+          <button onclick="simulateDownload('${d.id}')" class="btn btn-pri">${iconDownload()} Download (simulated)</button>
+          <div class="flex-1"></div>
+          <button onclick="closeModal()" class="btn btn-ghost">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function simulateDownload(docId) {
+  const d = Store.docs.find(x => x.id === docId);
+  if (!d) return;
+  const c = Store.cases.find(x => x.id === d.caseId);
+  audit('DOWNLOAD_DOCUMENT', 'SerialDocument', d.id, c.caseNumber, 'presigned URL issued (simulated)', { filename: d.originalFilename });
+  Store.save();
+  toast(`Presigned S3 URL issued for ${d.originalFilename || 'document'} (demo)`, 'default');
+}
+
+// ── Search ────────────────────────────────────────────────────────
+let searchState = { q:'', results:null, classificationFilter:'', typeFilter:'' };
+
+function viewSearch() {
+  return shell(`
+    <div class="mb-6">
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Full-Text Search</div>
+      <h1 class="font-display text-4xl font-semibold mt-1">Search</h1>
+      <div class="text-ink-700/70 text-sm mt-1.5">Across titles, descriptions, OCR text, and case metadata.</div>
+    </div>
+
+    <div class="card p-5 mb-5">
+      <form onsubmit="runSearch(event)" class="flex items-end gap-3">
+        <div class="flex-1">
+          <label class="lbl">Query</label>
+          <input id="search-q" type="text" class="field" placeholder="e.g., armed robbery witness, demand note, SharePoint, SSA, hash"
+                 value="${esc(searchState.q)}" autofocus>
+        </div>
+        <button class="btn btn-pri" type="submit">${iconSearchSm()} Search</button>
+      </form>
+
+      <div class="mt-4 flex items-center gap-3 text-[11px] font-mono tracking-wider text-ink-700/60">
+        <span>EXAMPLES:</span>
+        ${['robbery','intrusion','FD-302','cyber','Hudson','kickback','OneDrive'].map(ex => `
+          <button onclick="quickSearch('${ex}')" class="hover:text-ink-900 underline underline-offset-2">${ex}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    ${searchState.results ? renderSearchResults() : `
+      <div class="card p-12 text-center text-ink-700/60 text-sm">
+        Enter a query above to search across all indexed documents.
+      </div>
+    `}
+  `, 'Search');
+}
+
+function renderSearchResults() {
+  const r = searchState.results;
+  return `
+    <div class="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-5">
+      <!-- facets -->
+      <div class="card p-5 h-fit">
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-3">Facets</div>
+
+        <div class="mb-5">
+          <div class="lbl mb-2">Classification</div>
+          <div class="space-y-1">
+            ${r.classFacets.map(f => `
+              <button onclick="toggleFacet('classificationFilter','${f.key}')"
+                      class="w-full text-left flex items-center gap-2 text-[13px] px-2 py-1 rounded
+                             ${searchState.classificationFilter === f.key ? 'bg-ink-800 text-paper' : 'hover:bg-ink-50'}">
+                <span class="font-mono flex-1">${esc(f.key)}</span>
+                <span class="font-mono text-[11px] num">${f.count}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div>
+          <div class="lbl mb-2">Document type</div>
+          <div class="space-y-1">
+            ${r.typeFacets.map(f => `
+              <button onclick="toggleFacet('typeFilter','${f.key}')"
+                      class="w-full text-left flex items-center gap-2 text-[13px] px-2 py-1 rounded
+                             ${searchState.typeFilter === f.key ? 'bg-ink-800 text-paper' : 'hover:bg-ink-50'}">
+                <span class="font-mono flex-1">${esc(f.key.replace('_','-'))}</span>
+                <span class="font-mono text-[11px] num">${f.count}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        ${(searchState.classificationFilter || searchState.typeFilter) ? `
+          <button onclick="searchState.classificationFilter=''; searchState.typeFilter=''; render()" class="mt-4 text-[11px] text-stamp-red font-mono tracking-wider">CLEAR FILTERS</button>
+        ` : ''}
+      </div>
+
+      <!-- hits -->
+      <div class="card">
+        <div class="p-5 border-b border-ink-200 flex items-center justify-between">
+          <div class="font-mono text-[11px] tracking-wider text-ink-700/70 num">
+            ${r.total} hit${r.total !== 1 ? 's' : ''} · ${r.tookMs}ms
+          </div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">
+            Query: <span class="text-ink-900">"${esc(searchState.q)}"</span>
+          </div>
+        </div>
+
+        ${r.hits.length === 0 ? `
+          <div class="p-12 text-center text-ink-700/60 text-sm">No hits. Try broader terms.</div>
+        ` : `
+          <div>
+            ${r.hits.map(h => {
+              const c = Store.cases.find(x => x.id === h.caseId);
+              const d = Store.docs.find(x => x.id === h.id);
+              return `
+                <div class="p-5 border-b border-ink-100 last:border-0 hover:bg-ink-50/50 cursor-pointer" onclick="Router.go('case',{id:'${h.caseId}'})">
+                  <div class="flex items-start gap-3">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-baseline gap-2 flex-wrap">
+                        <span class="casenum text-[13px]">${esc(c?.caseNumber || '')}</span>
+                        <span class="text-ink-700/50">·</span>
+                        <span class="font-mono text-[11px] text-ink-700/70">Serial #${String(d?.serialIndex || 0).padStart(3,'0')}</span>
+                        <span class="font-mono text-[11px] bg-ink-100 px-1.5 py-0.5 rounded">${esc((d?.documentType || '').replace('_','-'))}</span>
+                      </div>
+                      <div class="font-medium mt-1">${highlight(d?.title || '', searchState.q)}</div>
+                      ${d?.extractedText ? `
+                        <div class="text-[13px] text-ink-700/80 mt-2 leading-relaxed">
+                          …${highlight(snippet(d.extractedText, searchState.q), searchState.q)}…
+                        </div>
+                      ` : ''}
+                    </div>
+                    <div class="font-mono text-[10.5px] text-ink-700/60 text-right flex-shrink-0">
+                      score<br><span class="text-ink-900 font-semibold">${h.score.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const escQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(${escQ})`, 'gi');
+  return esc(text).replace(re, '<mark>$1</mark>');
+}
+
+function snippet(text, q, len = 200) {
+  if (!text) return '';
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(q.toLowerCase());
+  if (idx < 0) return text.slice(0, len);
+  const start = Math.max(0, idx - 60);
+  return text.slice(start, start + len);
+}
+
+function quickSearch(q) {
+  document.getElementById('search-q').value = q;
+  searchState.q = q;
+  searchState.classificationFilter = '';
+  searchState.typeFilter = '';
+  runSearchInner(q);
+}
+
+function runSearch(event) {
+  event.preventDefault();
+  const q = document.getElementById('search-q').value.trim();
+  if (!q) return;
+  searchState.q = q;
+  runSearchInner(q);
+}
+
+function runSearchInner(q) {
+  const start = performance.now();
+  const qLower = q.toLowerCase();
+
+  let hits = Store.docs
+    .map(d => {
+      const c = Store.cases.find(x => x.id === d.caseId);
+      let score = 0;
+      const title = (d.title || '').toLowerCase();
+      const desc  = (d.description || '').toLowerCase();
+      const body  = (d.extractedText || '').toLowerCase();
+      const cNum  = (c?.caseNumber || '').toLowerCase();
+      const cTitle= (c?.title || '').toLowerCase();
+      if (title.includes(qLower)) score += 3;
+      if (cTitle.includes(qLower)) score += 2;
+      if (desc.includes(qLower))  score += 2;
+      if (body.includes(qLower))  score += 1;
+      if (cNum.includes(qLower))  score += 4;
+      if (d.documentType.toLowerCase().includes(qLower)) score += 1.5;
+      return { id:d.id, caseId:d.caseId, score };
+    })
+    .filter(h => h.score > 0);
+
+  // apply facet filters
+  if (searchState.classificationFilter) {
+    hits = hits.filter(h => {
+      const c = Store.cases.find(x => x.id === h.caseId);
+      return c?.classificationCode === searchState.classificationFilter;
+    });
+  }
+  if (searchState.typeFilter) {
+    hits = hits.filter(h => Store.docs.find(x => x.id === h.id)?.documentType === searchState.typeFilter);
+  }
+  hits.sort((a,b) => b.score - a.score);
+
+  // facets (computed from full hit set before facet filtering for demo simplicity — compute from filtered here)
+  const classFacets = facetCount(hits, h => Store.cases.find(c => c.id === h.caseId)?.classificationCode);
+  const typeFacets  = facetCount(hits, h => Store.docs.find(d => d.id === h.id)?.documentType);
+
+  searchState.results = {
+    total: hits.length,
+    hits: hits.slice(0, 25),
+    classFacets, typeFacets,
+    tookMs: Math.max(1, Math.round(performance.now() - start) + Math.floor(Math.random() * 8))
+  };
+  render();
+}
+
+function facetCount(items, extractor) {
+  const map = new Map();
+  for (const i of items) {
+    const k = extractor(i);
+    if (!k) continue;
+    map.set(k, (map.get(k) || 0) + 1);
+  }
+  return [...map.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a,b) => b.count - a.count);
+}
+
+function toggleFacet(key, value) {
+  searchState[key] = searchState[key] === value ? '' : value;
+  runSearchInner(searchState.q);
+}
+
+// ── Workflows visualization ───────────────────────────────────────
+function viewWorkflows() {
+  const activeByStatus = Store.cases.reduce((acc, c) => (acc[c.status] = (acc[c.status] || 0) + 1, acc), {});
+  const recent = Store.cases.slice()
+    .sort((a,b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+    .slice(0, 8);
+  const pipelineDocs = Store.docs.filter(d => d.processingStatus !== 'INDEXED' && d.processingStatus !== 'FAILED');
+
+  return shell(`
+    <div class="mb-6">
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Temporal Orchestration</div>
+      <h1 class="font-display text-4xl font-semibold mt-1">Workflows</h1>
+      <div class="text-ink-700/70 text-sm mt-1.5">Live view of long-running case-lifecycle workflows and document ingest pipelines.</div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <!-- state machine card -->
+      <div class="card p-6">
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-2">Case lifecycle · state machine</div>
+        <h2 class="font-display text-xl font-semibold mb-5">Current distribution</h2>
+        <svg viewBox="0 0 420 280" class="w-full h-auto">
+          ${stateMachineSvg(activeByStatus)}
+        </svg>
+      </div>
+
+      <!-- ingest pipeline -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">Document Ingest · Temporal Pipeline</div>
+            <h2 class="font-display text-xl font-semibold mt-1">In-flight documents</h2>
+          </div>
+          <div class="font-mono text-[11px] tracking-wider text-ink-700/70 num">
+            ${pipelineDocs.length} running · ${Store.docs.filter(d => d.processingStatus === 'INDEXED').length} complete
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          ${['VIRUS_SCANNING','CONVERTING','OCR_PENDING','OCR_COMPLETE','INDEXED'].map((s, i, arr) => {
+            const count = Store.docs.filter(d => d.processingStatus === s).length;
+            const pct = Store.docs.length > 0 ? (count / Store.docs.length * 100) : 0;
+            return `
+              <div class="flex items-center gap-3 text-[13px]">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-mono font-bold flex-shrink-0
+                            bg-ink-100 text-ink-700 ${count > 0 && s !== 'INDEXED' ? 'pulse' : ''}">${i+1}</div>
+                <div class="flex-1">
+                  <div class="flex justify-between items-baseline">
+                    <span class="font-mono text-[11px] tracking-wider">${s.replace(/_/g,' ')}</span>
+                    <span class="font-mono text-[11px] num text-ink-700/70">${count}</span>
+                  </div>
+                  <div class="h-1.5 bg-ink-100 rounded-full mt-1 overflow-hidden">
+                    <div class="h-full bg-ink-800" style="width:${pct}%"></div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        ${pipelineDocs.length > 0 ? `
+          <div class="mt-5 pt-5 border-t border-ink-200">
+            <div class="lbl mb-2">Currently processing</div>
+            ${pipelineDocs.map(d => {
+              const c = Store.cases.find(x => x.id === d.caseId);
+              return `
+                <div class="flex items-center gap-3 py-1.5">
+                  <span class="badge pstat-${d.processingStatus}">${d.processingStatus.replace(/_/g,' ')}</span>
+                  <span class="text-[13px] truncate flex-1">${esc(d.title)}</span>
+                  <span class="casenum text-[11px] text-ink-700/70">${esc(c?.caseNumber || '')}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- workflow list -->
+    <div class="card">
+      <div class="p-5 border-b border-ink-200">
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">Recent workflow activity</div>
+        <h2 class="font-display text-xl font-semibold mt-1">Case lifecycle workflows</h2>
+      </div>
+      <table class="dossier">
+        <thead>
+          <tr>
+            <th>Workflow ID</th>
+            <th>Case</th>
+            <th>Current state</th>
+            <th>Assigned</th>
+            <th>Last transition</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${recent.map(c => {
+            const assigned = Store.users.find(u => u.username === c.assignedAgentId);
+            return `
+              <tr onclick="Router.go('case', {id:'${c.id}'})">
+                <td><span class="font-mono text-[11px] text-ink-700/70">${esc(c.workflowId || '—')}</span></td>
+                <td><span class="casenum text-[13px]">${esc(c.caseNumber)}</span></td>
+                <td><span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span></td>
+                <td class="text-[13px]">${esc(assigned?.name || c.assignedAgentId || '—')}</td>
+                <td class="text-[12px]">${dateFmt(c.updatedAt || c.createdAt)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `, 'Workflows');
+}
+
+function stateMachineSvg(counts) {
+  const nodes = [
+    { id:'DRAFT',            x: 60, y: 50,  w:100, h:38 },
+    { id:'PENDING_APPROVAL', x: 60, y: 130, w:100, h:38 },
+    { id:'OPEN',             x: 60, y: 210, w:100, h:38 },
+    { id:'SUSPENDED',        x: 220,y: 210, w:100, h:38 },
+    { id:'CLOSURE_REVIEW',   x: 220,y: 130, w:100, h:38 },
+    { id:'CLOSED',           x: 220,y: 50,  w:100, h:38 }
+  ];
+  const edges = [
+    ['DRAFT','PENDING_APPROVAL','submit'],
+    ['PENDING_APPROVAL','OPEN','approve'],
+    ['PENDING_APPROVAL','DRAFT','reject'],
+    ['OPEN','SUSPENDED','suspend'],
+    ['SUSPENDED','OPEN','resume'],
+    ['OPEN','CLOSURE_REVIEW','req. closure'],
+    ['CLOSURE_REVIEW','CLOSED','confirm']
+  ];
+
+  const nMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const nodeSvg = nodes.map(n => {
+    const c = counts[n.id] || 0;
+    const active = c > 0;
+    const fill = active ? '#1c1b17' : '#f5f3ea';
+    const stroke = active ? '#1c1b17' : '#d9d5c3';
+    const text = active ? '#f5f3ea' : '#6b695f';
+    return `
+      <g>
+        <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="3"
+              fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+        <text x="${n.x + n.w/2}" y="${n.y + 17}" text-anchor="middle"
+              font-family="JetBrains Mono" font-size="10" font-weight="700"
+              letter-spacing="1.2" fill="${text}">${n.id.replace(/_/g,' ')}</text>
+        <text x="${n.x + n.w/2}" y="${n.y + 31}" text-anchor="middle"
+              font-family="Newsreader" font-size="13" font-weight="600" fill="${active ? '#c7a35a' : '#bcbab3'}">${c}</text>
+      </g>
+    `;
+  }).join('');
+
+  const edgeSvg = edges.map(([a,b,label]) => {
+    const na = nMap[a], nb = nMap[b];
+    const ax = na.x + na.w / 2, ay = na.y + na.h / 2;
+    const bx = nb.x + nb.w / 2, by = nb.y + nb.h / 2;
+    // find closest edge points
+    let x1 = ax, y1 = ay, x2 = bx, y2 = by;
+    if (na.x === nb.x) { // vertical
+      if (ay < by) { y1 = na.y + na.h; y2 = nb.y; } else { y1 = na.y; y2 = nb.y + nb.h; }
+    } else if (na.y === nb.y) { // horizontal
+      if (ax < bx) { x1 = na.x + na.w; x2 = nb.x; } else { x1 = na.x; x2 = nb.x + nb.w; }
+    }
+    return `
+      <g>
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#6b695f" stroke-width="1" marker-end="url(#arr)"/>
+        <text x="${(x1+x2)/2 + 4}" y="${(y1+y2)/2 - 4}" font-family="JetBrains Mono" font-size="8"
+              letter-spacing="0.5" fill="#6b695f">${label}</text>
+      </g>
+    `;
+  }).join('');
+
+  return `
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#6b695f"/>
+      </marker>
+    </defs>
+    ${edgeSvg}
+    ${nodeSvg}
+  `;
+}
+
+// ── Audit log ─────────────────────────────────────────────────────
+let auditFilter = { actor:'', action:'' };
+
+function viewAudit() {
+  if (!Store.hasAnyRole('AUDITOR','SYSTEM_ADMIN')) return viewForbidden();
+
+  const filtered = Store.audit.filter(a => {
+    if (auditFilter.actor && a.actorUsername !== auditFilter.actor) return false;
+    if (auditFilter.action && a.action !== auditFilter.action) return false;
+    return true;
+  });
+
+  const actors  = [...new Set(Store.audit.map(a => a.actorUsername))].sort();
+  const actions = [...new Set(Store.audit.map(a => a.action))].sort();
+
+  return shell(`
+    <div class="mb-6">
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">Immutable Record</div>
+      <h1 class="font-display text-4xl font-semibold mt-1">Audit trail</h1>
+      <div class="text-ink-700/70 text-sm mt-1.5">Append-only log of material actions. Retention: 7 years minimum.</div>
+    </div>
+
+    <div class="card p-4 mb-4">
+      <div class="flex items-end gap-3 flex-wrap">
+        <div>
+          <label class="lbl">Actor</label>
+          <select class="field field-sm" onchange="auditFilter.actor=this.value; render()">
+            <option value="">All users</option>
+            ${actors.map(a => `<option value="${a}" ${auditFilter.actor === a ? 'selected' : ''}>${a}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Action</label>
+          <select class="field field-sm" onchange="auditFilter.action=this.value; render()">
+            <option value="">All actions</option>
+            ${actions.map(a => `<option value="${a}" ${auditFilter.action === a ? 'selected' : ''}>${a}</option>`).join('')}
+          </select>
+        </div>
+        ${(auditFilter.actor || auditFilter.action) ? `
+          <button class="btn btn-ghost btn-sm" onclick="auditFilter={actor:'',action:''}; render()">Clear</button>
+        ` : ''}
+        <div class="ml-auto font-mono text-[11px] tracking-wider text-ink-700/70 num">
+          ${filtered.length} / ${Store.audit.length} events
+        </div>
+      </div>
+    </div>
+
+    <div class="card overflow-hidden">
+      <table class="dossier">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Case</th>
+            <th>Entity</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.length === 0 ? `
+            <tr><td colspan="6" class="text-center py-12 text-ink-700/60">No events match the current filters.</td></tr>
+          ` : filtered.map(a => `
+            <tr>
+              <td class="text-[12px] whitespace-nowrap">
+                ${dateFmt(a.occurredAt)}
+                <div class="text-[10.5px] text-ink-700/60">${timeAgo(a.occurredAt)}</div>
+              </td>
+              <td>
+                <div class="font-medium text-[13px]">${esc(a.actorUsername)}</div>
+                <div class="font-mono text-[10.5px] text-ink-700/60">${esc((a.actorRoles || '').replace(/ROLE_/g,''))}</div>
+              </td>
+              <td><span class="font-mono text-[11px] bg-ink-100 px-2 py-1 rounded">${esc(a.action)}</span></td>
+              <td>${a.caseNumber ? `<a href="#case?id=${Store.cases.find(c=>c.caseNumber===a.caseNumber)?.id}" class="casenum text-[12px] hover:underline" onclick="event.stopPropagation()">${esc(a.caseNumber)}</a>` : '<span class="text-ink-700/40">—</span>'}</td>
+              <td class="font-mono text-[11px] text-ink-700/70">${esc(a.entityType || '')} ${a.entityId ? '· ' + esc(a.entityId.slice(0,12)) : ''}</td>
+              <td class="text-[13px]">${esc(a.outcome || '—')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `, 'Audit trail');
+}
+
+// ── Administration ────────────────────────────────────────────────
+function viewAdmin() {
+  if (!Store.hasRole('SYSTEM_ADMIN')) return viewForbidden();
+
+  return shell(`
+    <div class="mb-6">
+      <div class="font-mono text-[11px] tracking-[0.2em] uppercase text-ink-700/60">System Administration</div>
+      <h1 class="font-display text-4xl font-semibold mt-1">Administration</h1>
+      <div class="text-ink-700/70 text-sm mt-1.5">User directory, role assignments, and system configuration.</div>
+    </div>
+
+    <div class="card mb-6">
+      <div class="p-5 border-b border-ink-200 flex items-center justify-between">
+        <div>
+          <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60">§ Directory</div>
+          <h2 class="font-display text-xl font-semibold mt-0.5">Users &amp; roles</h2>
+        </div>
+        <span class="font-mono text-[11px] tracking-wider text-ink-700/70 num">${Store.users.length} accounts</span>
+      </div>
+      <table class="dossier">
+        <thead>
+          <tr><th>Name</th><th>Username</th><th>Email</th><th>Badge</th><th>Office</th><th>Roles</th></tr>
+        </thead>
+        <tbody>
+          ${Store.users.map(u => `
+            <tr>
+              <td class="font-medium">${esc(u.name)}</td>
+              <td><span class="font-mono text-[12px]">${esc(u.username)}</span></td>
+              <td class="text-[12px]">${esc(u.email)}</td>
+              <td><span class="font-mono text-[12px]">${esc(u.badge)}</span></td>
+              <td><span class="font-mono text-[12px]">${esc(u.office)}</span></td>
+              <td>
+                <div class="flex flex-wrap gap-1">
+                  ${u.roles.map(r => `<span class="font-mono text-[10px] bg-ink-100 px-1.5 py-0.5 rounded">${esc(r.replace('ROLE_',''))}</span>`).join('')}
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="card p-5">
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-1">§ Classifications</div>
+        <h3 class="font-display text-lg font-semibold mb-3">Case classification codes</h3>
+        <div class="space-y-1">
+          ${CLASSIFICATIONS.map(c => `
+            <div class="flex items-center gap-3 py-1 text-[13px]">
+              <span class="font-mono font-bold w-12">${esc(c.code)}</span>
+              <span class="flex-1">${esc(c.label)}</span>
+              <span class="font-mono text-[10.5px] text-ink-700/60 num">${Store.cases.filter(x => x.classificationCode === c.code).length} cases</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-1">§ Offices</div>
+        <h3 class="font-display text-lg font-semibold mb-3">Field offices</h3>
+        <div class="space-y-1">
+          ${OFFICES.map(o => `
+            <div class="flex items-center gap-3 py-1 text-[13px]">
+              <span class="font-mono font-bold w-12">${esc(o.code)}</span>
+              <span class="flex-1">${esc(o.label)}</span>
+              <span class="font-mono text-[10.5px] text-ink-700/60 num">${Store.cases.filter(x => x.originatingOffice === o.code).length} cases</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-5 mt-5">
+      <div class="font-mono text-[10.5px] tracking-[0.15em] uppercase text-ink-700/60 mb-1">§ Danger zone</div>
+      <h3 class="font-display text-lg font-semibold mb-1">Demo data management</h3>
+      <div class="text-[13px] text-ink-700/70 mb-3">All demo state lives in your browser's localStorage. Resetting restores the original seed fixtures.</div>
+      <button onclick="if(confirm('Reset all demo data? This cannot be undone.')) Store.reset()" class="btn btn-danger">${iconReset()} Reset demo data</button>
+    </div>
+  `, 'Administration');
+}
+
+// ── Forbidden ─────────────────────────────────────────────────────
+function viewForbidden() {
+  return shell(`
+    <div class="max-w-md mx-auto text-center py-16">
+      <div class="stamp stamp-red inline-flex no-rotate text-base mb-5">403 · ACCESS DENIED</div>
+      <h1 class="font-display text-3xl font-semibold mt-4">Insufficient clearance</h1>
+      <p class="text-ink-700/70 mt-2 mb-6">
+        Your role set does not include permission for this resource. Return to the dashboard or sign in with a different identity.
+      </p>
+      <a href="#dashboard" class="btn btn-pri">Back to dashboard</a>
+    </div>
+  `, 'Forbidden');
+}
+
+// ── Command palette ───────────────────────────────────────────────
+function openCommandPalette() {
+  const modal = document.createElement('div');
+  modal.id = 'modal-root';
+  modal.className = 'modal-backdrop';
+  modal.onclick = e => { if (e.target === modal) closeModal(); };
+  modal.innerHTML = `
+    <div class="modal" style="max-width:560px">
+      <div class="p-4 border-b border-ink-200">
+        <input id="cmd-input" type="text" class="field" autofocus placeholder="Type a case #, title, or user…" oninput="renderCmdResults()">
+      </div>
+      <div id="cmd-results" class="max-h-80 overflow-y-auto p-2"></div>
+      <div class="p-3 border-t border-ink-200 font-mono text-[10.5px] tracking-wider text-ink-700/60 flex items-center gap-3">
+        <span>↵ open</span><span>·</span><span>esc close</span>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  setTimeout(() => renderCmdResults(), 0);
+  document.getElementById('cmd-input').addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Enter') {
+      const first = document.querySelector('#cmd-results [data-cmd-item]');
+      if (first) first.click();
+    }
+  });
+}
+function renderCmdResults() {
+  const q = (document.getElementById('cmd-input')?.value || '').trim().toLowerCase();
+  const box = document.getElementById('cmd-results');
+  if (!box) return;
+  if (!q) {
+    box.innerHTML = `
+      <div class="p-3 font-mono text-[11px] tracking-wider text-ink-700/60 uppercase">RECENT</div>
+      ${Store.cases.slice(0,5).map(c => cmdRow(c)).join('')}
+    `;
+    return;
+  }
+  const matches = Store.cases.filter(c =>
+    c.caseNumber.toLowerCase().includes(q) || c.title.toLowerCase().includes(q) ||
+    (c.tags || []).some(t => t.toLowerCase().includes(q))
+  ).slice(0, 10);
+  box.innerHTML = matches.length ? matches.map(c => cmdRow(c)).join('') :
+    `<div class="p-6 text-center text-ink-700/60 text-sm">No cases match "${esc(q)}"</div>`;
+}
+function cmdRow(c) {
+  return `
+    <a data-cmd-item href="#case?id=${c.id}" onclick="closeModal()"
+       class="flex items-center gap-3 p-2.5 hover:bg-ink-100 rounded">
+      <span class="casenum text-[12px] w-36 flex-shrink-0">${esc(c.caseNumber)}</span>
+      <span class="text-[13px] flex-1 truncate">${esc(c.title)}</span>
+      <span class="badge status-${c.status}">${c.status.replace(/_/g,' ')}</span>
+    </a>
+  `;
+}
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    if (Store.currentUser() && !document.getElementById('modal-root')) openCommandPalette();
+  }
+});
+</script>
+
+<!-- ============================================================== -->
+<!--                          ICONS                                  -->
+<!-- ============================================================== -->
+<script>
+const ICON = 'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+function iconDashboard() { return `<svg ${ICON}><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>`; }
+function iconFolder()    { return `<svg ${ICON}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`; }
+function iconSearch()    { return `<svg ${ICON}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`; }
+function iconSearchSm()  { return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`; }
+function iconWorkflow()  { return `<svg ${ICON}><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M6 9v3a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9"/></svg>`; }
+function iconShield()    { return `<svg ${ICON}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`; }
+function iconCog()       { return `<svg ${ICON}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`; }
+function iconPlus()      { return `<svg ${ICON}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`; }
+function iconUpload()    { return `<svg ${ICON}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`; }
+function iconDownload()  { return `<svg ${ICON}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`; }
+function iconCheck()     { return `<svg ${ICON}><polyline points="20 6 9 17 4 12"/></svg>`; }
+function iconX()         { return `<svg ${ICON}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`; }
+function iconArrow()     { return `<svg ${ICON}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`; }
+function iconPause()     { return `<svg ${ICON}><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`; }
+function iconPlay()      { return `<svg ${ICON}><polygon points="5 3 19 12 5 21 5 3"/></svg>`; }
+function iconLock()      { return `<svg ${ICON}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`; }
+function iconUndo()      { return `<svg ${ICON}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`; }
+function iconLogout()    { return `<svg ${ICON}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`; }
+function iconReset()     { return `<svg ${ICON}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`; }
+</script>
+
+<!-- ============================================================== -->
+<!--                      RENDER                                     -->
+<!-- ============================================================== -->
+<script>
+function render() {
+  const app = document.getElementById('app');
+  if (!Store.currentUser() && Router.route !== 'login') {
+    Router.route = 'login';
+  }
+
+  let html;
+  switch (Router.route) {
+    case 'login':     html = viewLogin();     break;
+    case 'dashboard': html = viewDashboard(); break;
+    case 'cases':     html = viewCases();     break;
+    case 'new-case':  html = viewNewCase();   break;
+    case 'case':      html = viewCase();      break;
+    case 'search':    html = viewSearch();    break;
+    case 'workflows': html = viewWorkflows(); break;
+    case 'audit':     html = viewAudit();     break;
+    case 'admin':     html = viewAdmin();     break;
+    default:          html = viewDashboard();
+  }
+  app.innerHTML = html;
+}
+
+// initial route
+Router.fromHash();
+render();
+</script>
+
+</body>
+</html>

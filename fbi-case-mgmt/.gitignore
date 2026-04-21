@@ -1,0 +1,23 @@
+## Build outputs
+backend/target/
+frontend/dist/
+frontend/node_modules/
+frontend/.angular/
+
+## IDE
+.idea/
+.vscode/
+*.iml
+
+## Logs / runtime
+*.log
+*.pid
+
+## Env / secrets
+.env
+.env.*
+!.env.example
+
+## OS
+.DS_Store
+Thumbs.db

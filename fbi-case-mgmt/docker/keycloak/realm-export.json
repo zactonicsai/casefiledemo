@@ -1,0 +1,136 @@
+{
+  "realm": "sentinel",
+  "enabled": true,
+  "displayName": "Sentinel Case Management",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "failureFactor": 5,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+
+  "roles": {
+    "realm": [
+      { "name": "ROLE_SYSTEM_ADMIN",   "description": "Full system administration" },
+      { "name": "ROLE_SUPERVISOR",     "description": "Approves case actions, reassigns work" },
+      { "name": "ROLE_AGENT",          "description": "Creates and works cases, files FD-302s" },
+      { "name": "ROLE_ANALYST",        "description": "Read access + search/analytics" },
+      { "name": "ROLE_RECORDS_CLERK",  "description": "Indexes documents into CRS" },
+      { "name": "ROLE_AUDITOR",        "description": "Read-only audit log access" }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "sentinel-web",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://localhost"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "sentinel-web",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+
+  "users": [
+    {
+      "username": "sa.admin",
+      "enabled": true,
+      "email": "sa.admin@example.gov",
+      "firstName": "System",
+      "lastName": "Admin",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Password1!", "temporary": false }],
+      "realmRoles": ["ROLE_SYSTEM_ADMIN", "ROLE_AUDITOR"],
+      "attributes": { "badgeNumber": ["SA-0001"], "office": ["HQ"] }
+    },
+    {
+      "username": "supervisor.jones",
+      "enabled": true,
+      "email": "supervisor.jones@example.gov",
+      "firstName": "Dana",
+      "lastName": "Jones",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Password1!", "temporary": false }],
+      "realmRoles": ["ROLE_SUPERVISOR", "ROLE_AGENT"],
+      "attributes": { "badgeNumber": ["SSA-1047"], "office": ["WF"] }
+    },
+    {
+      "username": "agent.smith",
+      "enabled": true,
+      "email": "agent.smith@example.gov",
+      "firstName": "John",
+      "lastName": "Smith",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Password1!", "temporary": false }],
+      "realmRoles": ["ROLE_AGENT"],
+      "attributes": { "badgeNumber": ["SA-2291"], "office": ["NY"] }
+    },
+    {
+      "username": "analyst.doe",
+      "enabled": true,
+      "email": "analyst.doe@example.gov",
+      "firstName": "Jane",
+      "lastName": "Doe",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Password1!", "temporary": false }],
+      "realmRoles": ["ROLE_ANALYST"],
+      "attributes": { "badgeNumber": ["IA-0812"], "office": ["HQ"] }
+    },
+    {
+      "username": "clerk.miller",
+      "enabled": true,
+      "email": "clerk.miller@example.gov",
+      "firstName": "Alex",
+      "lastName": "Miller",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Password1!", "temporary": false }],
+      "realmRoles": ["ROLE_RECORDS_CLERK"],
+      "attributes": { "badgeNumber": ["RC-5512"], "office": ["HQ"] }
+    }
+  ]
+}

@@ -1,0 +1,254 @@
+name: sentinel-cms
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ============================================================
+  # PostgreSQL — primary relational store (cases, users, audit)
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cms-postgres
+    environment:
+      POSTGRES_MULTIPLE_DATABASES: casemgmt,keycloak,temporal,temporal_visibility
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: cms_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init-scripts/postgres-init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cms"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    networks: [cms-net]
+
+  # ============================================================
+  # Keycloak — OIDC identity provider
+  # ============================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: cms-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: cms
+      KC_DB_PASSWORD: cms_dev_password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\nhost: localhost\\n\\n' >&3 && cat <&3 | grep -q 'UP'"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+    logging: *default-logging
+    networks: [cms-net]
+
+  # ============================================================
+  # Elasticsearch — full-text index
+  # ============================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: cms-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - cluster.name=cms-cluster
+      - node.name=cms-node-1
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -q 'yellow\\|green'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    logging: *default-logging
+    networks: [cms-net]
+
+  # ============================================================
+  # Kibana — optional ES admin UI (dev only)
+  # ============================================================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: cms-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    profiles: ["dev-tools"]
+    logging: *default-logging
+    networks: [cms-net]
+
+  # ============================================================
+  # LocalStack — S3 + SQS emulator
+  # ============================================================
+  localstack:
+    image: localstack/localstack:3.5
+    container_name: cms-localstack
+    environment:
+      - SERVICES=s3,sqs,sts
+      - DEBUG=0
+      - DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - PERSISTENCE=1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./infra/aws/localstack-init.sh:/etc/localstack/init/ready.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"\\(running\\|available\\)\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+    networks: [cms-net]
+
+  # ============================================================
+  # Temporal — workflow engine
+  # ============================================================
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: cms-temporal
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=cms
+      - POSTGRES_PWD=cms_dev_password
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./docker/temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    logging: *default-logging
+    networks: [cms-net]
+
+  temporal-ui:
+    image: temporalio/ui:2.28.0
+    container_name: cms-temporal-ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:4200
+    ports:
+      - "8088:8080"
+    depends_on:
+      - temporal
+    logging: *default-logging
+    networks: [cms-net]
+
+  # ============================================================
+  # OCR sidecar — Tesseract over HTTP (called by backend)
+  # ============================================================
+  # Tesseract is bundled directly inside the backend image to
+  # keep the footprint smaller. No separate service needed.
+
+  # ============================================================
+  # Backend — Spring Boot 3.5 (Java 21)
+  # ============================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cms-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/casemgmt
+      SPRING_DATASOURCE_USERNAME: cms
+      SPRING_DATASOURCE_PASSWORD: cms_dev_password
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/sentinel
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/sentinel/protocol/openid-connect/certs
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      APP_AWS_ENDPOINT: http://localstack:4566
+      APP_S3_BUCKET: cms-documents
+      APP_SQS_INGEST_QUEUE: cms-ingest-queue
+      APP_SQS_OCR_QUEUE: cms-ocr-queue
+      TEMPORAL_SERVICE_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    logging: *default-logging
+    networks: [cms-net]
+
+  # ============================================================
+  # Frontend — Angular served via nginx reverse-proxy
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cms-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    logging: *default-logging
+    networks: [cms-net]
+
+volumes:
+  postgres_data:
+  es_data:
+  localstack_data:
+
+networks:
+  cms-net:
+    driver: bridge

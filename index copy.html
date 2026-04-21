@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL | FBI Case Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        /* Custom scrollbar for a sleeker look */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 font-sans h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
+        <div class="p-4 border-b border-slate-700 flex items-center space-x-3">
+            <i class="fa-solid fa-shield-halved text-blue-500 text-2xl"></i>
+            <div>
+                <h1 class="text-xl font-bold text-white tracking-widest">SENTINEL</h1>
+                <p class="text-xs text-slate-400">CMS Simulation v1.0</p>
+            </div>
+        </div>
+        <nav class="flex-1 p-4 space-y-2">
+            <button onclick="switchView('cases')" class="w-full flex items-center space-x-3 px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition">
+                <i class="fa-solid fa-folder-open w-5"></i> <span>Cases & Records</span>
+            </button>
+            <button onclick="switchView('map')" class="w-full flex items-center space-x-3 px-4 py-2 rounded-md text-slate-300 hover:bg-slate-700 hover:text-white transition">
+                <i class="fa-solid fa-map-location-dot w-5"></i> <span>Geospatial Intelligence</span>
+            </button>
+            <button onclick="switchView('workflows')" class="w-full flex items-center space-x-3 px-4 py-2 rounded-md text-slate-300 hover:bg-slate-700 hover:text-white transition">
+                <i class="fa-solid fa-network-wired w-5"></i> <span>Workflows & Tasks</span>
+            </button>
+        </nav>
+        <div class="p-4 border-t border-slate-700">
+            <button onclick="resetData()" class="w-full px-4 py-2 text-sm text-red-400 hover:text-red-300 border border-red-900 hover:bg-red-900/30 rounded transition">
+                Reset Local Data
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+        
+        <header class="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 shrink-0">
+            <div class="relative w-96">
+                <i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i>
+                <input type="text" id="searchInput" placeholder="Global Search (Case ID, Title, Agent)..." 
+                       class="w-full bg-slate-900 border border-slate-600 rounded-md py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                       onkeyup="handleSearch()">
+            </div>
+            <div class="flex items-center space-x-4">
+                <button onclick="openModal('addCaseModal')" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-semibold transition">
+                    <i class="fa-solid fa-plus mr-2"></i> New Case
+                </button>
+                <div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center border border-slate-500 tooltip relative cursor-pointer">
+                    <i class="fa-solid fa-user"></i>
+                    <div class="tooltip-text absolute top-10 right-0 w-48 bg-slate-700 text-white text-xs p-2 rounded shadow-lg z-50">
+                        Agent ID: 8942-X<br>Clearance: TS/SCI<br>Role: Lead Investigator
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-auto p-6 relative">
+            
+            <div id="view-cases" class="view-section active">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-white">Active Case Master List</h2>
+                    <span class="text-sm text-slate-400">Click column headers to sort</span>
+                </div>
+                <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden shadow-xl">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-slate-900/50 border-b border-slate-700">
+                            <tr>
+                                <th class="p-4 cursor-pointer hover:text-blue-400" onclick="sortTable('id')">Case ID <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-4 cursor-pointer hover:text-blue-400" onclick="sortTable('title')">Title <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-4 cursor-pointer hover:text-blue-400" onclick="sortTable('type')">Classification <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-4 cursor-pointer hover:text-blue-400" onclick="sortTable('status')">Status <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-4 cursor-pointer hover:text-blue-400" onclick="sortTable('lead')">Lead Agent <i class="fa-solid fa-sort ml-1"></i></th>
+                                <th class="p-4 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="casesTableBody" class="divide-y divide-slate-700/50">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-map" class="view-section hidden h-full flex flex-col">
+                <h2 class="text-2xl font-bold text-white mb-4">Geospatial Intelligence</h2>
+                <div class="flex space-x-2 mb-4">
+                    <button onclick="map.setView([39.8283, -98.5795], 4)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">USA View</button>
+                    <button onclick="map.setView([20, 0], 2)" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">World View</button>
+                </div>
+                <div id="mapContainer" class="flex-1 rounded-lg border border-slate-700 shadow-xl w-full"></div>
+            </div>
+
+            <div id="view-workflows" class="view-section hidden">
+                <h2 class="text-2xl font-bold text-white mb-4">Document Approval Workflows</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="workflowCards">
+                    </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="caseModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-lg border border-slate-600 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900">
+                <h3 class="text-xl font-bold text-white" id="modalCaseId">CASE ID</h3>
+                <button onclick="closeModal('caseModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 grid grid-cols-3 gap-6">
+                
+                <div class="col-span-2 space-y-6">
+                    <div>
+                        <h4 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Subject Title</h4>
+                        <p id="modalCaseTitle" class="text-2xl font-bold text-white"></p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-900/50 p-3 rounded border border-slate-700">
+                            <span class="text-xs text-slate-400 block mb-1">Classification</span>
+                            <span id="modalCaseType" class="font-medium"></span>
+                        </div>
+                        <div class="bg-slate-900/50 p-3 rounded border border-slate-700">
+                            <span class="text-xs text-slate-400 block mb-1">Location</span>
+                            <span id="modalCaseLoc" class="font-medium"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Synopsis</h4>
+                        <p id="modalCaseDesc" class="text-slate-300 leading-relaxed text-sm bg-slate-900 p-4 rounded border border-slate-700"></p>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Digital Evidence & Files</h4>
+                            <label class="cursor-pointer bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-xs text-white transition">
+                                <i class="fa-solid fa-upload mr-1"></i> Upload File
+                                <input type="file" class="hidden" onchange="simulateUpload(this)">
+                            </label>
+                        </div>
+                        <ul id="modalCaseFiles" class="space-y-2 bg-slate-900 p-3 rounded border border-slate-700">
+                            </ul>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="bg-slate-900 p-4 rounded border border-slate-700">
+                        <h4 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Case Status</h4>
+                        <div id="modalCaseStatusBadge" class="inline-block px-3 py-1 rounded-full text-xs font-bold mb-4"></div>
+                        
+                        <div class="space-y-2 mt-4 border-t border-slate-700 pt-4">
+                            <p class="text-xs text-slate-400 mb-2">Document Generation</p>
+                            <button onclick="generateDocument('FD-302')" class="w-full bg-slate-700 hover:bg-slate-600 text-left px-3 py-2 rounded text-sm transition flex justify-between items-center">
+                                <span>Create FD-302 (Interview)</span> <i class="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                            <button onclick="generateDocument('EC')" class="w-full bg-slate-700 hover:bg-slate-600 text-left px-3 py-2 rounded text-sm transition flex justify-between items-center">
+                                <span>Draft Electronic Comm (EC)</span> <i class="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-900 p-4 rounded border border-slate-700">
+                        <h4 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Active Leads / Tasks</h4>
+                        <ul id="modalCaseTasks" class="space-y-3 text-sm">
+                            </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="addCaseModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-lg border border-slate-600 w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900">
+                <h3 class="text-xl font-bold text-white">Initialize New Case</h3>
+                <button onclick="closeModal('addCaseModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="newCaseForm" onsubmit="handleNewCase(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Case Title</label>
+                    <input type="text" id="newTitle" required class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Classification</label>
+                        <select id="newType" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 focus:outline-none">
+                            <option>Cyber</option>
+                            <option>Counterterrorism</option>
+                            <option>White Collar</option>
+                            <option>Violent Crime</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Location (City, State)</label>
+                        <input type="text" id="newLoc" required placeholder="e.g., Chicago, IL" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Synopsis</label>
+                    <textarea id="newDesc" required rows="3" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white focus:border-blue-500 focus:outline-none"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-700">
+                    <button type="button" onclick="closeModal('addCaseModal')" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm transition">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition">Open Case</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Data & State Management ---
+        const MOCK_DATA = [
+            { id: "288A-HQ-10293", title: "Operation Phantom Thread", type: "Cyber", status: "Active", lead: "S. Rossi", loc: "Washington, D.C.", lat: 38.8951, lng: -77.0364, desc: "Investigation into distributed ransomware attacks on east coast healthcare networks. Primary vector suspected to be spear-phishing.", files: ["Traffic_Analysis_PCAP.zip", "Subpoena_Returns_ISP.pdf"], tasks: [{desc: "Interview IT Director", done: true}, {desc: "Draft FD-302 for Suspect Alpha", done: false}], workflowState: "Active Investigation" },
+            { id: "100B-NY-99212", title: "Midtown Syndicate", type: "Violent Crime", status: "Pending Review", lead: "D. Reyes", loc: "New York, NY", lat: 40.7128, lng: -74.0060, desc: "RICO investigation targeting organized extortion rings operating in commercial real estate sectors.", files: ["Surveillance_Log_0412.docx", "Wiretap_Audio_Transcripts.pdf"], tasks: [{desc: "Coordinate with NYPD Task Force", done: true}], workflowState: "Awaiting SAC Approval" },
+            { id: "196D-LA-44581", title: "Silicon Mirage", type: "White Collar", status: "Closed", lead: "J. Chen", loc: "Los Angeles, CA", lat: 34.0522, lng: -118.2437, desc: "Securities fraud involving crypto-asset wash trading and false SEC filings.", files: ["Financial_Audit_Final.pdf"], tasks: [], workflowState: "Referred to USAO" },
+            { id: "315F-TX-88231", title: "Borderline Echo", type: "Counterterrorism", status: "Active", lead: "M. Vance", loc: "El Paso, TX", lat: 31.7619, lng: -106.4850, desc: "Monitoring domestic extremist chatter regarding infrastructure sabotage in the southwest power grid.", files: ["Threat_Assessment_EC.pdf"], tasks: [{desc: "Deploy aerial surveillance drone", done: false}, {desc: "Liaise with DHS", done: false}], workflowState: "Intelligence Gathering" }
+        ];
+
+        let cases = [];
+        let currentSort = { column: 'id', order: 'asc' };
+        let currentCaseId = null;
+        let map = null;
+        let mapMarkers = [];
+
+        // --- Initialization ---
+        function initApp() {
+            // Load from LocalStorage or use Mock Data
+            const storedData = localStorage.getItem('fbi_cases');
+            if (storedData) {
+                cases = JSON.parse(storedData);
+            } else {
+                cases = JSON.parse(JSON.stringify(MOCK_DATA));
+                saveData();
+            }
+            renderTable();
+            renderWorkflows();
+        }
+
+        function saveData() {
+            localStorage.setItem('fbi_cases', JSON.stringify(cases));
+        }
+
+        function resetData() {
+            if(confirm("Are you sure you want to purge local records and restore defaults?")) {
+                localStorage.removeItem('fbi_cases');
+                initApp();
+            }
+        }
+
+        // --- View Management ---
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.add('hidden');
+            });
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            
+            // Re-render map to fix sizing issues when hidden
+            if(viewId === 'map') {
+                if(!map) initMap();
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        }
+
+        // --- Table & Rendering Logic ---
+        function getStatusColor(status) {
+            switch(status) {
+                case 'Active': return 'bg-green-500/20 text-green-400 border border-green-500/30';
+                case 'Pending Review': return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
+                case 'Closed': return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+                default: return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+            }
+        }
+
+        function renderTable(dataToRender = cases) {
+            const tbody = document.getElementById('casesTableBody');
+            tbody.innerHTML = '';
+            
+            if(dataToRender.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500">No records found matching criteria.</td></tr>`;
+                return;
+            }
+
+            dataToRender.forEach(c => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/80 transition cursor-pointer group";
+                tr.onclick = (e) => {
+                    // Prevent row click if clicking action button
+                    if(!e.target.closest('button')) openCaseDetails(c.id);
+                };
+                
+                tr.innerHTML = `
+                    <td class="p-4 font-mono text-blue-400 group-hover:text-blue-300">
+                        <span class="tooltip relative">
+                            ${c.id}
+                            <span class="tooltip-text absolute bottom-full left-0 mb-2 w-48 bg-slate-900 border border-slate-600 text-xs p-2 rounded shadow-lg z-50">
+                                DB Index: ${Math.floor(Math.random()*10000)}<br>Created: ${new Date().toLocaleDateString()}
+                            </span>
+                        </span>
+                    </td>
+                    <td class="p-4 font-semibold">${c.title}</td>
+                    <td class="p-4">${c.type}</td>
+                    <td class="p-4"><span class="px-2 py-1 rounded text-xs ${getStatusColor(c.status)}">${c.status}</span></td>
+                    <td class="p-4">${c.lead}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="openCaseDetails('${c.id}')" class="text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded transition text-xs">
+                            View File
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- Search and Sort ---
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = cases.filter(c => 
+                c.id.toLowerCase().includes(query) || 
+                c.title.toLowerCase().includes(query) ||
+                c.lead.toLowerCase().includes(query)
+            );
+            renderTable(filtered);
+        }
+
+        function sortTable(column) {
+            if (currentSort.column === column) {
+                currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.order = 'asc';
+            }
+
+            cases.sort((a, b) => {
+                let valA = a[column].toLowerCase();
+                let valB = b[column].toLowerCase();
+                if (valA < valB) return currentSort.order === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.order === 'asc' ? 1 : -1;
+                return 0;
+            });
+            
+            // Re-apply search filter if exists
+            handleSearch(); 
+        }
+
+        // --- Modal & Case Detail Logic ---
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        function openCaseDetails(id) {
+            currentCaseId = id;
+            const c = cases.find(x => x.id === id);
+            if(!c) return;
+
+            document.getElementById('modalCaseId').innerText = c.id;
+            document.getElementById('modalCaseTitle').innerText = c.title;
+            document.getElementById('modalCaseType').innerText = c.type;
+            document.getElementById('modalCaseLoc').innerText = c.loc;
+            document.getElementById('modalCaseDesc').innerText = c.desc;
+            
+            const badge = document.getElementById('modalCaseStatusBadge');
+            badge.innerText = c.status;
+            badge.className = `inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 ${getStatusColor(c.status)}`;
+
+            // Render Files
+            const filesContainer = document.getElementById('modalCaseFiles');
+            filesContainer.innerHTML = c.files.map(f => `
+                <li class="flex justify-between items-center text-sm border-b border-slate-700/50 pb-2 last:border-0 last:pb-0">
+                    <span class="flex items-center"><i class="fa-solid fa-file-lines text-slate-500 mr-2"></i> ${f}</span>
+                    <button class="text-blue-400 hover:text-blue-300"><i class="fa-solid fa-download"></i></button>
+                </li>
+            `).join('') || '<li class="text-xs text-slate-500">No evidence uploaded.</li>';
+
+            // Render Tasks/Leads
+            const tasksContainer = document.getElementById('modalCaseTasks');
+            tasksContainer.innerHTML = c.tasks.map((t, index) => `
+                <li class="flex items-start cursor-pointer hover:bg-slate-800 p-1 rounded" onclick="toggleTask(${index})">
+                    <i class="fa-${t.done ? 'solid text-green-500' : 'regular text-slate-500'} fa-circle-check mt-1 mr-2"></i>
+                    <span class="${t.done ? 'line-through text-slate-500' : 'text-slate-300'}">${t.desc}</span>
+                </li>
+            `).join('') || '<li class="text-xs text-slate-500">No active leads.</li>';
+
+            openModal('caseModal');
+        }
+
+        function toggleTask(taskIndex) {
+            const c = cases.find(x => x.id === currentCaseId);
+            c.tasks[taskIndex].done = !c.tasks[taskIndex].done;
+            saveData();
+            openCaseDetails(currentCaseId); // Re-render modal
+            renderWorkflows(); // Update workflow view
+        }
+
+        // --- Document Simulation ---
+        function generateDocument(docType) {
+            const c = cases.find(x => x.id === currentCaseId);
+            const docName = `${docType}_${new Date().getTime().toString().slice(-4)}.pdf`;
+            c.files.push(docName);
+            c.tasks.push({desc: `Route ${docName} for Supervisor Approval`, done: false});
+            c.status = "Pending Review";
+            saveData();
+            openCaseDetails(currentCaseId);
+            renderTable();
+            renderWorkflows();
+            alert(`System: ${docType} successfully generated and added to case index.`);
+        }
+
+        function simulateUpload(input) {
+            if(input.files && input.files[0]) {
+                const c = cases.find(x => x.id === currentCaseId);
+                c.files.push(input.files[0].name);
+                saveData();
+                openCaseDetails(currentCaseId);
+            }
+        }
+
+        // --- Form Handling ---
+        function handleNewCase(e) {
+            e.preventDefault();
+            
+            // Faux geocoding logic based on input
+            const locInput = document.getElementById('newLoc').value;
+            // Add a little randomness to lat/lng for map spread
+            const lat = 35 + (Math.random() * 10 - 5); 
+            const lng = -95 + (Math.random() * 30 - 15);
+
+            const newCase = {
+                id: `${Math.floor(Math.random()*900 + 100)}X-ZZ-${Math.floor(Math.random()*90000 + 10000)}`,
+                title: document.getElementById('newTitle').value,
+                type: document.getElementById('newType').value,
+                status: "Active",
+                lead: "Agent (Self)",
+                loc: locInput,
+                lat: lat,
+                lng: lng,
+                desc: document.getElementById('newDesc').value,
+                files: ["Opening_EC.pdf"],
+                tasks: [{desc: "Conduct initial subject assessment", done: false}],
+                workflowState: "Draft"
+            };
+
+            cases.push(newCase);
+            saveData();
+            
+            document.getElementById('newCaseForm').reset();
+            closeModal('addCaseModal');
+            renderTable();
+            if(map) addMapMarker(newCase);
+            
+            // Auto open the new case
+            openCaseDetails(newCase.id);
+        }
+
+        // --- Leaflet Map Logic ---
+        function initMap() {
+            // Centered on USA
+            map = L.map('mapContainer').setView([39.8283, -98.5795], 4);
+
+            // OpenStreetMap tiles (Free, no key needed)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Add markers for existing cases
+            cases.forEach(c => addMapMarker(c));
+        }
+
+        function addMapMarker(c) {
+            if(!c.lat || !c.lng) return;
+            
+            // Custom styling for marker
+            const markerColor = c.status === 'Active' ? '#ef4444' : (c.status === 'Pending Review' ? '#eab308' : '#64748b');
+            
+            const circleMarker = L.circleMarker([c.lat, c.lng], {
+                radius: 8,
+                fillColor: markerColor,
+                color: '#fff',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+
+            circleMarker.bindPopup(`
+                <div class="text-slate-800 text-sm font-sans w-48">
+                    <strong class="block text-base border-b pb-1 mb-1">${c.id}</strong>
+                    <b>${c.title}</b><br>
+                    Type: ${c.type}<br>
+                    Location: ${c.loc}<br>
+                    <button onclick="switchView('cases'); openCaseDetails('${c.id}')" class="mt-2 w-full bg-blue-600 text-white rounded py-1 text-xs hover:bg-blue-700">Open Record</button>
+                </div>
+            `);
+            mapMarkers.push(circleMarker);
+        }
+
+        // --- Workflows / Task Board Logic ---
+        function renderWorkflows() {
+            const container = document.getElementById('workflowCards');
+            
+            const pendingCases = cases.filter(c => c.status === "Pending Review" || c.tasks.some(t => !t.done));
+            
+            container.innerHTML = pendingCases.map(c => {
+                const pendingTasks = c.tasks.filter(t => !t.done).length;
+                return `
+                <div class="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-mono text-blue-400">${c.id}</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Action Req</span>
+                    </div>
+                    <h3 class="font-bold text-white mb-2 truncate">${c.title}</h3>
+                    <p class="text-xs text-slate-400 mb-4 border-b border-slate-700 pb-2">State: ${c.workflowState}</p>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-300"><i class="fa-solid fa-list-check text-slate-500 mr-1"></i> ${pendingTasks} Open Leads</span>
+                        <button onclick="switchView('cases'); openCaseDetails('${c.id}')" class="text-blue-400 hover:text-white transition">Process <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                    </div>
+                </div>
+                `;
+            }).join('') || '<div class="col-span-3 text-center text-slate-500 py-8">No pending workflows in queue.</div>';
+        }
+
+        // Bootstrap
+        document.addEventListener('DOMContentLoaded', initApp);
+
+    </script>
+</body>
+</html>
