@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SENTINEL — Case Management System (Demo)</title>
+<title>DEMO  — Case Management System (Demo)</title>
 
 <!-- Tailwind (Play CDN — demo-only) -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
@@ -604,8 +604,8 @@ const SEED_AUDIT = [
 <!-- ============================================================== -->
 <script>
 const LS = {
-  USERS:'sentinel.users', CASES:'sentinel.cases', DOCS:'sentinel.docs',
-  AUDIT:'sentinel.audit', SESSION:'sentinel.session'
+  USERS:'DEMO.users', CASES:'DEMO.cases', DOCS:'DEMO.docs',
+  AUDIT:'DEMO.audit', SESSION:'DEMO.session'
 };
 
 function loadOrSeed(key, seed) {
@@ -663,8 +663,8 @@ const Store = {
 
 // ── UI preferences (theme + font scale + mobile nav) ──────────────
 const Prefs = {
-  theme: localStorage.getItem('sentinel.theme') || 'light',
-  fontScale: parseFloat(localStorage.getItem('sentinel.fontScale') || '1'),
+  theme: localStorage.getItem('DEMO.theme') || 'light',
+  fontScale: parseFloat(localStorage.getItem('DEMO.fontScale') || '1'),
   mobileNavOpen: false,
 
   apply() {
@@ -673,7 +673,7 @@ const Prefs = {
   },
   setTheme(t) {
     this.theme = t;
-    localStorage.setItem('sentinel.theme', t);
+    localStorage.setItem('DEMO.theme', t);
     this.apply();
     render();
     // resize map if present
@@ -682,7 +682,7 @@ const Prefs = {
   toggleTheme() { this.setTheme(this.theme === 'dark' ? 'light' : 'dark'); },
   setFontScale(s) {
     this.fontScale = Math.max(0.8, Math.min(1.4, Math.round(s * 100) / 100));
-    localStorage.setItem('sentinel.fontScale', String(this.fontScale));
+    localStorage.setItem('DEMO.fontScale', String(this.fontScale));
     this.apply();
     render();
   },
@@ -807,7 +807,7 @@ function viewLogin() {
     <div class="login-bg min-h-screen flex items-center justify-center p-6">
       <div class="w-full max-w-md">
         <div class="text-center mb-8">
-          <div class="seal-ring mb-5"><div class="seal-inner">SENTINEL</div></div>
+          <div class="seal-ring mb-5"><div class="seal-inner">DEMO</div></div>
           <h1 class="font-display text-3xl font-semibold text-paper tracking-wide">Case Management System</h1>
           <div class="mt-2 font-mono text-xs text-paper/50 tracking-[0.2em]">UNCLASSIFIED // REFERENCE</div>
         </div>
@@ -879,7 +879,7 @@ function shell(inner, pageLabel) {
     <aside class="sidebar ${Prefs.mobileNavOpen ? 'open' : ''}">
       <div class="px-5 pt-6 pb-5 border-b border-white/5 flex items-center justify-between">
         <div>
-          <div class="font-mono font-bold text-sm tracking-[0.4em]" style="color: var(--accent)">SENTINEL</div>
+          <div class="font-mono font-bold text-sm tracking-[0.4em]" style="color: var(--accent)">DEMO</div>
           <div class="text-[10.5px] font-mono tracking-[0.15em] mt-1" style="color: var(--sidebar-muted)">CASE MGMT SYSTEM</div>
         </div>
         <button class="hamburger p-1" onclick="Prefs.closeMobileNav()" style="color: var(--sidebar-fg)">${iconX()}</button>
@@ -1124,7 +1124,7 @@ function viewDashboard() {
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         ${[
-          {k:'Keycloak OIDC', v:'Online', note:'sentinel realm'},
+          {k:'Keycloak OIDC', v:'Online', note:'DEMO realm'},
           {k:'PostgreSQL',    v:'Online', note:'case store · audit'},
           {k:'Elasticsearch', v:'Online', note:`${Store.docs.length} indexed`},
           {k:'Temporal',      v:'Online', note:'workflows active'},
