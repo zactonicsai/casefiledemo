@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SENTINEL — Case Management System (Demo)</title>
+<title>Demo Only — Case Management System (Demo)</title>
 
 <!-- Tailwind (Play CDN — demo-only) -->
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
@@ -440,8 +440,8 @@ const SEED_AUDIT = [
 <!-- ============================================================== -->
 <script>
 const LS = {
-  USERS:'sentinel.users', CASES:'sentinel.cases', DOCS:'sentinel.docs',
-  AUDIT:'sentinel.audit', SESSION:'sentinel.session'
+  USERS:'Demo Only.users', CASES:'Demo Only.cases', DOCS:'Demo Only.docs',
+  AUDIT:'Demo Only.audit', SESSION:'Demo Only.session'
 };
 
 function loadOrSeed(key, seed) {
@@ -603,7 +603,7 @@ function viewLogin() {
     <div class="login-bg min-h-screen flex items-center justify-center p-6">
       <div class="w-full max-w-md">
         <div class="text-center mb-8">
-          <div class="seal-ring mb-5"><div class="seal-inner">SENTINEL</div></div>
+          <div class="seal-ring mb-5"><div class="seal-inner">Demo Only</div></div>
           <h1 class="font-display text-3xl font-semibold text-paper tracking-wide">Case Management System</h1>
           <div class="mt-2 font-mono text-xs text-paper/50 tracking-[0.2em]">UNCLASSIFIED // REFERENCE</div>
         </div>
@@ -671,7 +671,7 @@ function shell(inner, pageLabel) {
     <!-- sidebar -->
     <aside class="w-60 bg-ink-900 text-paper flex-shrink-0 flex flex-col">
       <div class="px-5 pt-6 pb-5 border-b border-white/5">
-        <div class="font-mono font-bold text-sm tracking-[0.4em] text-[#c7a35a]">SENTINEL</div>
+        <div class="font-mono font-bold text-sm tracking-[0.4em] text-[#c7a35a]">Demo Only</div>
         <div class="text-[10.5px] font-mono tracking-[0.15em] text-paper/50 mt-1">CASE MGMT SYSTEM</div>
       </div>
       <nav class="py-3 flex-1">
@@ -898,7 +898,7 @@ function viewDashboard() {
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         ${[
-          {k:'Keycloak OIDC', v:'Online', note:'sentinel realm'},
+          {k:'Keycloak OIDC', v:'Online', note:'Demo Only realm'},
           {k:'PostgreSQL',    v:'Online', note:'case store · audit'},
           {k:'Elasticsearch', v:'Online', note:`${Store.docs.length} indexed`},
           {k:'Temporal',      v:'Online', note:'workflows active'},
